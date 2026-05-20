@@ -223,6 +223,7 @@ export default function LearningJourney() {
   const [banditProfile, setBanditProfile] = useState<BanditProfile | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       getHistory().catch(() => [] as HistoryEntry[]),
       getSurveyComparison(),

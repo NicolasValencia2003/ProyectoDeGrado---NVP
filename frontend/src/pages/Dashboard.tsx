@@ -4,6 +4,7 @@ import { getRecommendation, getSurvey, getBiasAnalysis, logBehaviorEvent } from 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Recommendation, RecommendationItem, BiasAnalysisResult } from '../types';
+import { dashboardCache } from '../lib/dashboardCache';
 import LiveStrip from '../components/LiveStrip';
 import ScenarioTabs from '../components/ScenarioTabs';
 import PersonalizationProgress from '../components/PersonalizationProgress';
@@ -11,8 +12,7 @@ import BiasAlert from '../components/BiasAlert';
 import AcademicBanner from '../components/AcademicBanner';
 import PortfolioSimulator from '../components/PortfolioSimulator';
 
-// Module-level cache: survives React Router navigation (SPA never reloads the module)
-let memCache: Recommendation | null = null;
+export type AssetPreferences = Record<string, { saved: boolean; liked: boolean; disliked: boolean }>;
 
 function SkeletonCard() {
   return (
@@ -41,17 +41,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
 
-  const [data, setData]               = useState<Recommendation | null>(memCache);
-  const [activeItems, setActiveItems] = useState<RecommendationItem[] | null>(memCache?.recommendations ?? null);
-  const [loading, setLoading]         = useState(!memCache);
+  const [data, setData]               = useState<Recommendation | null>(dashboardCache.get());
+  const [activeItems, setActiveItems] = useState<RecommendationItem[] | null>(dashboardCache.get()?.recommendations ?? null);
+  const [loading, setLoading]         = useState(!dashboardCache.get());
   const [postSurveyDone, setPostSurveyDone] = useState(false);
   const [eventCount, setEventCount]   = useState(0);
   const [biasAnalysis, setBiasAnalysis] = useState<BiasAnalysisResult | null>(null);
+  const [preferences, setPreferences] = useState<AssetPreferences>({});
 
   const riskScore = profile?.risk_score ?? 7;
 
   useEffect(() => {
-    if (memCache) {
+    if (dashboardCache.get()) {
       setLoading(false);
       return;
     }
@@ -59,7 +60,7 @@ export default function Dashboard() {
     const timer = setTimeout(async () => {
       try {
         const result = await getRecommendation(riskScore);
-        memCache = result;
+        dashboardCache.set(result);
         setData(result);
         setActiveItems(result.recommendations);
         logBehaviorEvent('recommendation_requested', { asset_class: 'portfolio', sector: 'broad_market' });
@@ -77,6 +78,36 @@ export default function Dashboard() {
       supabase.from('user_preferences').select('event_count').eq('user_id', profile.id).single()
         .then(({ data }) => { if (data?.event_count) setEventCount(data.event_count); });
       getBiasAnalysis().then(setBiasAnalysis);
+
+      // Reconstruct persisted card states from event history
+      supabase
+        .from('user_events')
+        .select('asset_ticker, event_type')
+        .eq('user_id', profile.id)
+        .in('event_type', ['rate_up', 'rate_down', 'save', 'unsave'])
+        .not('asset_ticker', 'is', null)
+        .order('created_at', { ascending: false })
+        .then(({ data: events }) => {
+          if (!events?.length) return;
+          const prefs: AssetPreferences = {};
+          const ratingDone = new Set<string>();
+          const saveDone   = new Set<string>();
+          for (const ev of events) {
+            const t = ev.asset_ticker as string;
+            if (!t) continue;
+            if (!prefs[t]) prefs[t] = { saved: false, liked: false, disliked: false };
+            if ((ev.event_type === 'rate_up' || ev.event_type === 'rate_down') && !ratingDone.has(t)) {
+              prefs[t].liked    = ev.event_type === 'rate_up';
+              prefs[t].disliked = ev.event_type === 'rate_down';
+              ratingDone.add(t);
+            }
+            if ((ev.event_type === 'save' || ev.event_type === 'unsave') && !saveDone.has(t)) {
+              prefs[t].saved = ev.event_type === 'save';
+              saveDone.add(t);
+            }
+          }
+          setPreferences(prefs);
+        });
     }
   }, [profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -111,7 +142,7 @@ export default function Dashboard() {
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
         ) : (
-          <ScenarioTabs initialData={data} onItemsChange={setActiveItems} />
+          <ScenarioTabs initialData={data} onItemsChange={setActiveItems} preferences={preferences} />
         )}
       </div>
 

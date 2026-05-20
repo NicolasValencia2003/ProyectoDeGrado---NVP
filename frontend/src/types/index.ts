@@ -54,7 +54,7 @@ export interface HistoryEntry {
 }
 
 export interface UserEvent {
-  event_type: 'view' | 'dwell' | 'save' | 'dismiss' | 'rate_up' | 'rate_down';
+  event_type: 'view' | 'dwell' | 'save' | 'unsave' | 'dismiss' | 'rate_up' | 'rate_down';
   asset_ticker: string;
   asset_class: string;
   sector: string;

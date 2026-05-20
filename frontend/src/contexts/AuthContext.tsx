@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, type Profile } from '../lib/supabase';
+import { dashboardCache } from '../lib/dashboardCache';
 
 interface AuthContextType {
   session: Session | null;
@@ -35,16 +36,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session, loadProfile]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) await loadProfile(session.user.id);
-      setLoading(false);
-    });
+    // Safety valve: if getSession or loadProfile hang, unblock the app after 10s.
+    const fallback = setTimeout(() => setLoading(false), 10000);
+
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        setSession(session);
+        if (session?.user) {
+          try { await loadProfile(session.user.id); } catch { /* proceed without profile */ }
+        }
+      })
+      .catch(() => {})
+      .finally(() => { clearTimeout(fallback); setLoading(false); });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
-        await loadProfile(session.user.id);
+        try { await loadProfile(session.user.id); } catch { /* proceed without profile */ }
       } else {
         setProfile(null);
       }
@@ -53,10 +61,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
+  const signOut = useCallback(async () => {
+    dashboardCache.clear();
+    await supabase.auth.signOut().catch(() => {});
+    // Force-clear state immediately so the UI responds even if the
+    // onAuthStateChange callback is delayed or the network call failed.
+    setSession(null);
+    setProfile(null);
+  }, []);
+
   return (
     <AuthContext.Provider value={{
-      session, user: session?.user ?? null, profile, loading, refreshProfile,
-      signOut: () => supabase.auth.signOut(),
+      session, user: session?.user ?? null, profile, loading, refreshProfile, signOut,
     }}>
       {children}
     </AuthContext.Provider>

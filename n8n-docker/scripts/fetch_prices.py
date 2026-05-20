@@ -6,7 +6,13 @@ Writes to Supabase prices_cache table.
 """
 import os, sys, json
 from datetime import datetime
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import requests
 import yfinance as yf
+
+_no_verify_session = requests.Session()
+_no_verify_session.verify = False
 from supabase import create_client
 from universe import UNIVERSE, ALL_TICKERS
 
@@ -20,7 +26,8 @@ def main():
             interval="1d",
             progress=False,
             threads=True,
-            auto_adjust=True
+            auto_adjust=True,
+            session=_no_verify_session
         )
     except Exception as e:
         print(f"ERROR downloading prices: {e}", file=sys.stderr)

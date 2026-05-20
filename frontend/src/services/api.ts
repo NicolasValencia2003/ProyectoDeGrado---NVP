@@ -4,11 +4,18 @@ import { supabase } from '../lib/supabase';
 
 const api = axios.create({ baseURL: 'http://localhost:3000/api', timeout: 35000 });
 
-// Attach Supabase JWT to every request
+// Attach Supabase JWT to every request.
+// Race against a 3s timeout so a slow token-refresh never blocks requests indefinitely.
 api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+  try {
+    const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 3000));
+    const result = await Promise.race([supabase.auth.getSession(), timeout]);
+    const session = result && 'data' in result ? result.data.session : null;
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // proceed without auth header
   }
   return config;
 });

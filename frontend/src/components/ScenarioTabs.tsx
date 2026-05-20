@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { getRecommendation } from '../services/api';
 import type { Recommendation, RecommendationItem } from '../types';
 import RecommendationCard from './RecommendationCard';
+import type { AssetPreferences } from '../pages/Dashboard';
 
 interface Props {
   initialData: Recommendation | null;
   onItemsChange?: (items: RecommendationItem[]) => void;
+  preferences?: AssetPreferences;
 }
 
-export default function ScenarioTabs({ initialData, onItemsChange }: Props) {
+export default function ScenarioTabs({ initialData, onItemsChange, preferences = {} }: Props) {
   const userScore = parseInt(localStorage.getItem('risk_score') || '7', 10);
   const scenarios = [
     { label: 'Conservador',    override: Math.max(1, userScore - 3) },
@@ -129,6 +131,9 @@ export default function ScenarioTabs({ initialData, onItemsChange }: Props) {
                 index={i}
                 replacing={replacingSet.has(item.ticker)}
                 onReplace={(ticker) => handleReplace(activeIdx, ticker)}
+                initialSaved={preferences[item.ticker]?.saved}
+                initialLiked={preferences[item.ticker]?.liked}
+                initialDisliked={preferences[item.ticker]?.disliked}
               />
             ))}
           </div>

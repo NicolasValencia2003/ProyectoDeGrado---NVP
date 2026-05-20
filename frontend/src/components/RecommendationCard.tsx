@@ -17,6 +17,9 @@ interface Props {
   index: number;
   onReplace?: (ticker: string) => void;
   replacing?: boolean;
+  initialSaved?: boolean;
+  initialLiked?: boolean;
+  initialDisliked?: boolean;
 }
 
 function useBriefFeedback() {
@@ -28,12 +31,12 @@ function useBriefFeedback() {
   return [msg, show] as const;
 }
 
-export default function RecommendationCard({ item, index, onReplace, replacing }: Props) {
+export default function RecommendationCard({ item, index, onReplace, replacing, initialSaved = false, initialLiked = false, initialDisliked = false }: Props) {
   const logEvent   = useEventLogger();
   const mountTime  = useRef(Date.now());
-  const [saved, setSaved]       = useState(false);
-  const [liked, setLiked]       = useState(false);
-  const [disliked, setDisliked] = useState(false);
+  const [saved, setSaved]       = useState(initialSaved);
+  const [liked, setLiked]       = useState(initialLiked);
+  const [disliked, setDisliked] = useState(initialDisliked);
   const [alloc, setAlloc]       = useState(0);
   const [showTip, setShowTip]   = useState(false);
   const [feedback, showFeedback] = useBriefFeedback();
@@ -73,7 +76,7 @@ export default function RecommendationCard({ item, index, onReplace, replacing }
     const next = !saved;
     setSaved(next);
     showFeedback(next ? 'Guardado en tu referencia ✓' : 'Eliminado de guardados');
-    logEvent('save', { ticker: item.ticker, asset_class: item.asset_class, sector: item.sector });
+    logEvent(next ? 'save' : 'unsave', { ticker: item.ticker, asset_class: item.asset_class, sector: item.sector });
   }
 
   function handleLike() {
