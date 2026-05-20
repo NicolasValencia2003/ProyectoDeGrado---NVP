@@ -75,6 +75,54 @@ let BanditService = class BanditService {
             return {};
         }
     }
+    async getBanditProfile(userId) {
+        const empty = { top_liked: [], top_disliked: [], total_feedback_events: 0, total_tickers_seen: 0, personalization_pct: 0, positive_rate: 0 };
+        if (!this.supabase.isConfigured() || !userId)
+            return empty;
+        try {
+            const { data: events, error } = await this.supabase.db
+                .from('user_events')
+                .select('event_type, asset_ticker')
+                .eq('user_id', userId)
+                .in('event_type', ['view', 'rate_up', 'rate_down', 'save', 'dismiss'])
+                .not('asset_ticker', 'is', null);
+            if (error || !events?.length)
+                return empty;
+            const rewards = {};
+            const counts = {};
+            let totalFeedback = 0;
+            let positiveFeedback = 0;
+            for (const ev of events) {
+                const t = ev.asset_ticker;
+                if (!t || ev.event_type === 'view')
+                    continue;
+                const r = this.REWARDS[ev.event_type] ?? 0;
+                rewards[t] = (rewards[t] ?? 0) + r;
+                counts[t] = (counts[t] ?? 0) + 1;
+                totalFeedback++;
+                if (r > 0)
+                    positiveFeedback++;
+            }
+            const tickers = Object.keys(rewards);
+            const profile = tickers.map(ticker => ({
+                ticker,
+                net_reward: Math.round(rewards[ticker] * 100) / 100,
+                feedback_count: counts[ticker] ?? 0,
+            })).sort((a, b) => b.net_reward - a.net_reward);
+            return {
+                top_liked: profile.filter(p => p.net_reward > 0).slice(0, 4),
+                top_disliked: profile.filter(p => p.net_reward < 0).slice(0, 4),
+                total_feedback_events: totalFeedback,
+                total_tickers_seen: new Set(events.filter(e => e.event_type === 'view').map(e => e.asset_ticker)).size,
+                personalization_pct: Math.min(Math.round((totalFeedback / 20) * 100), 100),
+                positive_rate: totalFeedback > 0 ? Math.round((positiveFeedback / totalFeedback) * 100) : 0,
+            };
+        }
+        catch (err) {
+            this.log.warn('Bandit profile error: ' + err.message);
+            return empty;
+        }
+    }
     rank(tickers, ucbScores) {
         return [...tickers].sort((a, b) => {
             const sa = ucbScores[a] ?? Infinity;

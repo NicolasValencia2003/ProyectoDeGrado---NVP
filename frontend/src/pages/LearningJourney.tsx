@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { getHistory, getSurveyComparison, getBiasAnalysis } from '../services/api';
+import { getHistory, getSurveyComparison, getBiasAnalysis, getBanditProfile } from '../services/api';
+import type { BanditProfile } from '../services/api';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { HistoryEntry, SurveyResponse, BiasAnalysisResult } from '../types';
@@ -219,16 +220,19 @@ export default function LearningJourney() {
   const [comparison, setComparison] = useState<{ pre: SurveyResponse | null; post: SurveyResponse | null }>({ pre: null, post: null });
   const [biasLog, setBiasLog]     = useState<{ type: string; date: string }[]>([]);
   const [biasAnalysis, setBiasAnalysis] = useState<BiasAnalysisResult | null>(null);
+  const [banditProfile, setBanditProfile] = useState<BanditProfile | null>(null);
 
   useEffect(() => {
     Promise.all([
       getHistory().catch(() => [] as HistoryEntry[]),
       getSurveyComparison(),
       getBiasAnalysis(),
-    ]).then(([hist, comp, bias]) => {
+      getBanditProfile(),
+    ]).then(([hist, comp, bias, bandit]) => {
       setHistory(hist);
       setComparison(comp);
       setBiasAnalysis(bias);
+      setBanditProfile(bandit);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -319,6 +323,155 @@ export default function LearningJourney() {
               <StatCard icon="🎓" label="Encuesta post completada" value="✓" color="var(--green)" />
             )}
           </div>
+
+          {/* ── Panel 1: UCB1 learning profile ───────────────────────── */}
+          {banditProfile && banditProfile.total_feedback_events > 0 && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                🤖 Motor de aprendizaje UCB1 — Perfil aprendido
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 20px' }}>
+                El algoritmo Multi-Armed Bandit ha procesado{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>{banditProfile.total_feedback_events}</strong> eventos de feedback
+                sobre <strong style={{ color: 'var(--text-primary)' }}>{banditProfile.total_tickers_seen}</strong> activos distintos.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
+                {/* Liked tickers */}
+                {banditProfile.top_liked.length > 0 && (
+                  <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '14px 16px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, marginBottom: 10 }}>✓ Activos con recompensa positiva</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {banditProfile.top_liked.map(t => (
+                        <div key={t.ticker} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t.ticker}</span>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.feedback_count} ev.</span>
+                            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>+{t.net_reward.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Disliked tickers */}
+                {banditProfile.top_disliked.length > 0 && (
+                  <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '14px 16px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700, marginBottom: 10 }}>✗ Activos con recompensa negativa</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {banditProfile.top_disliked.map(t => (
+                        <div key={t.ticker} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t.ticker}</span>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.feedback_count} ev.</span>
+                            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>{t.net_reward.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* UCB1 summary metrics */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+                {[
+                  { label: 'Nivel de personalización', value: `${banditProfile.personalization_pct}%`, color: banditProfile.personalization_pct >= 80 ? 'var(--green)' : banditProfile.personalization_pct >= 40 ? 'var(--amber)' : 'var(--text-muted)' },
+                  { label: 'Tasa de feedback positivo', value: `${banditProfile.positive_rate}%`, color: banditProfile.positive_rate >= 60 ? 'var(--green)' : 'var(--text-secondary)' },
+                  { label: 'Eventos de feedback', value: banditProfile.total_feedback_events, color: 'var(--text-primary)' },
+                  { label: 'Activos explorados', value: banditProfile.total_tickers_seen, color: 'var(--text-primary)' },
+                ].map(m => (
+                  <div key={m.label} style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{m.label}</div>
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '14px 0 0', lineHeight: 1.6 }}>
+                Fórmula UCB1: score(i) = μᵢ + √2 · √(ln N / nᵢ) — Los activos con recompensa positiva aparecen primero en futuras recomendaciones; los nunca vistos se exploran prioritariamente.
+              </p>
+            </div>
+          )}
+
+          {/* ── Panel 2: Educational impact metrics ──────────────────── */}
+          {comparison.pre && comparison.post && (() => {
+            const knowledgeGainPct = Math.round(((comparison.post.section_a_score - comparison.pre.section_a_score) / 8) * 100);
+            const confidenceDelta  = comparison.post.section_b_score - comparison.pre.section_b_score;
+            const awarenessScore   = comparison.post.section_c_score;
+            return (
+              <div className="card" style={{ marginBottom: 24, borderLeft: '3px solid var(--blue)', borderRadius: '0 12px 12px 0' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
+                  📐 Métricas de impacto educativo — Validación OE5
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                  {[
+                    {
+                      label: 'Ganancia de conocimiento',
+                      value: `${knowledgeGainPct >= 0 ? '+' : ''}${knowledgeGainPct}%`,
+                      sub: `${comparison.pre.section_a_score}/8 → ${comparison.post.section_a_score}/8`,
+                      color: knowledgeGainPct > 0 ? 'var(--green)' : knowledgeGainPct < 0 ? 'var(--red)' : 'var(--text-muted)',
+                    },
+                    {
+                      label: 'Confianza en decisiones',
+                      value: `${comparison.post.section_b_score.toFixed(1)} / 5`,
+                      sub: `${confidenceDelta >= 0 ? '+' : ''}${confidenceDelta.toFixed(1)} vs. línea base`,
+                      color: comparison.post.section_b_score >= 3.5 ? 'var(--green)' : 'var(--amber)',
+                    },
+                    {
+                      label: 'Autoconciencia de sesgos',
+                      value: `${awarenessScore.toFixed(1)} / 5`,
+                      sub: 'Sección C — Encuesta post',
+                      color: awarenessScore >= 3.5 ? 'var(--green)' : 'var(--amber)',
+                    },
+                    {
+                      label: 'Valoración de la plataforma',
+                      value: `${comparison.post.overall_rating} / 10`,
+                      sub: 'Satisfacción general',
+                      color: comparison.post.overall_rating >= 7 ? 'var(--green)' : 'var(--amber)',
+                    },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{m.label}</div>
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: m.color, marginBottom: 2 }}>{m.value}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Panel 3: Recommendation history performance ───────────── */}
+          {history.length >= 2 && (() => {
+            const perfEntries = history.flatMap(e =>
+              e.payload.recommendations.filter((r: any) => r.performance_pct !== null && r.performance_pct !== undefined)
+            );
+            if (perfEntries.length === 0) return null;
+            const avg = perfEntries.reduce((s: number, r: any) => s + r.performance_pct, 0) / perfEntries.length;
+            const positive = perfEntries.filter((r: any) => r.performance_pct > 0).length;
+            const hitRate  = Math.round((positive / perfEntries.length) * 100);
+            return (
+              <div className="card" style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
+                  📊 Rendimiento histórico de recomendaciones
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+                  {[
+                    { label: 'Rendimiento promedio', value: `${avg >= 0 ? '+' : ''}${avg.toFixed(2)}%`, color: avg >= 0 ? 'var(--green)' : 'var(--red)' },
+                    { label: 'Tasa de acierto', value: `${hitRate}%`, color: hitRate >= 50 ? 'var(--green)' : 'var(--amber)' },
+                    { label: 'Recomendaciones evaluadas', value: perfEntries.length, color: 'var(--text-primary)' },
+                    { label: 'Sesiones analizadas', value: history.length, color: 'var(--text-primary)' },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '10px 14px' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{m.label}</div>
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 20, fontWeight: 700, color: m.color }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '12px 0 0', lineHeight: 1.6 }}>
+                  Variación calculada entre el precio al momento de la recomendación y el precio actual de mercado. No constituye asesoramiento financiero.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Bias radar */}
           {biasAnalysis && <BiasRadar analysis={biasAnalysis} />}

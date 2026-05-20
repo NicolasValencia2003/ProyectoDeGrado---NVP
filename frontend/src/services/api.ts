@@ -51,6 +51,21 @@ export const sendChatMessage = (
 export const getBiasAnalysis = (): Promise<BiasAnalysisResult> =>
   api.get('/bias/analysis').then(r => r.data).catch(() => ({ scores: {}, active: [], last_updated: '' }));
 
+export interface BanditProfile {
+  top_liked:             Array<{ ticker: string; net_reward: number; feedback_count: number }>;
+  top_disliked:          Array<{ ticker: string; net_reward: number; feedback_count: number }>;
+  total_feedback_events: number;
+  total_tickers_seen:    number;
+  personalization_pct:   number;
+  positive_rate:         number;
+}
+
+export const getBanditProfile = (): Promise<BanditProfile> =>
+  api.get('/bandit/profile').then(r => r.data).catch(() => ({
+    top_liked: [], top_disliked: [], total_feedback_events: 0,
+    total_tickers_seen: 0, personalization_pct: 0, positive_rate: 0,
+  }));
+
 export const logBehaviorEvent = (
   event_type: string,
   opts: { asset_class?: string; sector?: string; asset_ticker?: string; metadata?: Record<string, any> } = {},

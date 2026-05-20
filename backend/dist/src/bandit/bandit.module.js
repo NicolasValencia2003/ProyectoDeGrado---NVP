@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BanditModule = void 0;
 const common_1 = require("@nestjs/common");
 const bandit_service_1 = require("./bandit.service");
+const bandit_controller_1 = require("./bandit.controller");
 const supabase_module_1 = require("../supabase/supabase.module");
 let BanditModule = class BanditModule {
 };
@@ -16,6 +17,7 @@ exports.BanditModule = BanditModule;
 exports.BanditModule = BanditModule = __decorate([
     (0, common_1.Module)({
         imports: [supabase_module_1.SupabaseModule],
+        controllers: [bandit_controller_1.BanditController],
         providers: [bandit_service_1.BanditService],
         exports: [bandit_service_1.BanditService],
     })
