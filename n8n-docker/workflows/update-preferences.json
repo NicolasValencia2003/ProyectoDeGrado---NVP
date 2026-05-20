@@ -1,0 +1,113 @@
+{
+  "name": "FinVise - Update Preferences & Bias Detection (diario 02:00 COT)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "c1b2c3d4-0003-0003-0003-000000000001",
+      "name": "Diario 02:00 COT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://python-runner:8888/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\"script\": \"update_all_preferences\"}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "c1b2c3d4-0003-0003-0003-000000000002",
+      "name": "Ejecutar update_all_preferences",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c1b2c3d4-0003-0003-0003-000000000003",
+      "name": "¿Exitoso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "level": "info",
+        "message": "=✅ Preferencias y sesgos actualizados:\n{{ $('Ejecutar update_all_preferences').item.json.stdout }}"
+      },
+      "id": "c1b2c3d4-0003-0003-0003-000000000004",
+      "name": "Log OK",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1,
+      "position": [900, 240]
+    },
+    {
+      "parameters": {
+        "level": "error",
+        "message": "=❌ Error en update_all_preferences:\n{{ $('Ejecutar update_all_preferences').item.json.stderr }}"
+      },
+      "id": "c1b2c3d4-0003-0003-0003-000000000005",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1,
+      "position": [900, 380]
+    }
+  ],
+  "connections": {
+    "Diario 02:00 COT": {
+      "main": [
+        [{"node": "Ejecutar update_all_preferences", "type": "main", "index": 0}]
+      ]
+    },
+    "Ejecutar update_all_preferences": {
+      "main": [
+        [{"node": "¿Exitoso?", "type": "main", "index": 0}]
+      ]
+    },
+    "¿Exitoso?": {
+      "main": [
+        [{"node": "Log OK", "type": "main", "index": 0}],
+        [{"node": "Log Error", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

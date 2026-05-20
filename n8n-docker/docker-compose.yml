@@ -1,0 +1,45 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=finvise2025
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - FRED_API_KEY=${FRED_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+      - GENERIC_TIMEZONE=America/Bogota
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+    depends_on:
+      python-runner:
+        condition: service_healthy
+
+  python-runner:
+    image: python:3.11-alpine
+    restart: unless-stopped
+    working_dir: /scripts
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - FRED_API_KEY=${FRED_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["sh", "/scripts/start.sh"]
+    ports:
+      - "8888:8888"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  n8n_data:
