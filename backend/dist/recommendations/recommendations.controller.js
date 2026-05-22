@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RecommendationsController = void 0;
 const common_1 = require("@nestjs/common");
 const recommendations_service_1 = require("./recommendations.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const current_user_decorator_1 = require("../common/current-user.decorator");
 let RecommendationsController = class RecommendationsController {
     recommendationsService;
@@ -37,7 +36,6 @@ __decorate([
 ], RecommendationsController.prototype, "generate", null);
 exports.RecommendationsController = RecommendationsController = __decorate([
     (0, common_1.Controller)('recommendations'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [recommendations_service_1.RecommendationsService])
 ], RecommendationsController);
 //# sourceMappingURL=recommendations.controller.js.map

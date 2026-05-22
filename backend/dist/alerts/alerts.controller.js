@@ -15,28 +15,30 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AlertsController = void 0;
 const common_1 = require("@nestjs/common");
 const alerts_service_1 = require("./alerts.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const current_user_decorator_1 = require("../common/current-user.decorator");
 let AlertsController = class AlertsController {
     alertsService;
     constructor(alertsService) {
         this.alertsService = alertsService;
     }
-    getAll() { return this.alertsService.getAll(); }
-    markRead(id, user) {
-        return this.alertsService.markRead(+id, user.id);
+    getAll(user) {
+        return this.alertsService.getAll(user?.id ?? undefined);
+    }
+    markRead(conditionName, user) {
+        return this.alertsService.markRead(conditionName, user?.id ?? undefined);
     }
 };
 exports.AlertsController = AlertsController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AlertsController.prototype, "getAll", null);
 __decorate([
-    (0, common_1.Patch)(':id/read'),
-    __param(0, (0, common_1.Param)('id')),
+    (0, common_1.Patch)(':conditionName/read'),
+    __param(0, (0, common_1.Param)('conditionName')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
@@ -44,7 +46,6 @@ __decorate([
 ], AlertsController.prototype, "markRead", null);
 exports.AlertsController = AlertsController = __decorate([
     (0, common_1.Controller)('alerts'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [alerts_service_1.AlertsService])
 ], AlertsController);
 //# sourceMappingURL=alerts.controller.js.map

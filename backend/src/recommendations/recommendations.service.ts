@@ -1,9 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MarketDataFetcherService } from '../market/market-data-fetcher.service';
 import { buildLifeProfileContext, buildBiasInstructions } from '../portfolio/life-profile.service';
-import { MOCK_RECOMMENDATIONS } from '../mock/mock-data';
 import { BanditService } from '../bandit/bandit.service';
 
 const ALLOCATION_RULES: Record<string, Record<string, number>> = {
@@ -15,6 +14,7 @@ const ALLOCATION_RULES: Record<string, Record<string, number>> = {
 
 @Injectable()
 export class RecommendationsService {
+  private readonly logger = new Logger('RecommendationsService');
   private anthropic: Anthropic | null = null;
 
   constructor(
@@ -39,7 +39,7 @@ export class RecommendationsService {
       Promise.race([p, new Promise<T>(r => setTimeout(() => r(fallback), ms))]);
 
     const [pricesMap, sentiment, ucbScores] = await Promise.all([
-      timeout(10000, this.marketFetcher['buildFallbackPrices'](), this.marketFetcher.getPricesWithRefresh()),
+      timeout(10000, {}, this.marketFetcher.getPricesWithRefresh()),
       timeout(5000,  {}, this.marketFetcher.getSentimentWithRefresh()),
       timeout(5000,  {}, this.bandit.getScores(user.id ?? '')),
     ]);
@@ -54,12 +54,11 @@ export class RecommendationsService {
 
     const candidates = this.buildCandidates(score, pricesMap, user, prefs, excludedTickers, ucbScores);
 
-    let result: any;
-    if (this.anthropic) {
-      result = await this.generateWithClaude(user, prefs, candidates, pricesMap, sentiment, score, excludedTickers);
-    } else {
-      result = this.generateMock(score, pricesMap, excludedTickers, candidates);
+    if (!this.anthropic) {
+      throw new ServiceUnavailableException('El servicio de recomendaciones no está configurado. Contacta al administrador.');
     }
+
+    const result = await this.generateWithClaude(user, prefs, candidates, pricesMap, sentiment, score, excludedTickers);
 
     // Post-filter: guarantee excluded tickers never appear regardless of path
     if (excludedTickers.length > 0) {
@@ -174,81 +173,55 @@ Reemplaza el ejemplo con los tickers REALES del portafolio pre-calculado:
       }));
 
       if (this.supabase.isConfigured() && user.id) {
-        void this.supabase.db!.from('recommendation_history').insert({
+        const { error: histErr } = await this.supabase.db!.from('recommendation_history').insert({
           user_id:         user.id,
           risk_score_used: score,
           payload:         parsed,
           market_snapshot: {
-            fear_greed:       sentiment?.fear_greed ?? 62,
-            fear_greed_label: sentiment?.fear_greed_label ?? 'Neutral',
-            treasury_10y:     sentiment?.treasury_10y ?? 4.42,
+            fear_greed:       sentiment?.fear_greed       ?? null,
+            fear_greed_label: sentiment?.fear_greed_label ?? null,
+            treasury_10y:     sentiment?.treasury_10y     ?? null,
           },
         });
+        if (histErr) this.logger.error(`recommendation_history insert failed: ${histErr.message}`);
       }
 
       return parsed;
     } catch (err) {
-      console.error('Claude error, using mock fallback:', (err as Error).message);
-      return this.generateMock(score, pricesMap, excludedTickers);
+      const msg = (err as Error).message;
+      throw new ServiceUnavailableException(`Error al generar recomendaciones: ${msg}`);
     }
-  }
-
-  private generateMock(score: number, pricesMap: Record<string, any>, excludedTickers: string[] = [], candidates: any[] = []): any {
-    let band: string;
-    if (score <= 3)      band = 'conservative';
-    else if (score <= 8) band = 'balanced';
-    else                 band = 'aggressive';
-
-    const base = MOCK_RECOMMENDATIONS[band];
-    const baseFiltered = base.recommendations.filter((r: any) => !excludedTickers.includes(r.ticker));
-
-    // When tickers are excluded, supplement with candidates from the full pool
-    // so the replacement flow always finds a genuinely new ticker
-    const baseTickers = new Set(baseFiltered.map((r: any) => r.ticker));
-    const extras = candidates
-      .filter(c => !baseTickers.has(c.ticker) && !excludedTickers.includes(c.ticker))
-      .map(c => ({
-        ticker:         c.ticker,
-        name:           c.name,
-        allocation_pct: c.allocation_pct,
-        current_price:  c.current_price ?? null,
-        change_1d_pct:  c.change_1d_pct ?? null,
-        asset_class:    c.asset_class,
-        sector:         c.sector,
-        rationale:      `${c.name} es relevante para tu perfil como ejemplo educativo de activos de clase ${c.asset_class}. Su inclusión ilustra el principio de diversificación entre distintas clases de activos.`,
-        key_risk:       `Como todo activo de tipo ${c.asset_class}, presenta riesgos propios de su categoría que es importante comprender antes de invertir.`,
-      }));
-
-    return {
-      ...base,
-      recommendations: [
-        ...baseFiltered.map((r: any) => ({
-          ...r,
-          current_price: pricesMap[r.ticker]?.price ?? r.current_price,
-          change_1d_pct: pricesMap[r.ticker]?.change_1d_pct ?? r.change_1d_pct,
-          key_risk:      r.key_risk ?? r.key_concept,
-        })),
-        ...extras,
-      ],
-    };
   }
 
   private buildCandidates(score: number, pricesMap: Record<string, any>, user: any, prefs: any, extraExcluded: string[] = [], ucbScores: Record<string, number> = {}): any[] {
     const band     = score <= 3 ? 'conservative' : score <= 6 ? 'balanced' : score <= 8 ? 'growth' : 'aggressive';
     const rules    = ALLOCATION_RULES[band];
-    const excluded: string[] = user.excluded_sectors ?? [];
+    const excluded: string[] = [...(prefs?.excluded_sectors ?? []), ...(user.excluded_sectors ?? [])];
     const avoided:  string[] = [...(prefs?.avoided_tickers ?? []), ...extraExcluded];
     const merged   = { ...pricesMap };
 
+    // Build byClass with normal risk tolerance (±3). For each class that ends up empty,
+    // widen to ±5 so extreme scores (1 or 10) still get candidates in every class.
+    const buildByClass = (tolerance: number): Record<string, string[]> => {
+      const map: Record<string, string[]> = {};
+      for (const [ticker, p] of Object.entries(merged)) {
+        const risk = (p as any).risk_level ?? 5;
+        if (Math.abs(risk - score) > tolerance) continue;
+        if (excluded.includes((p as any).sector)) continue;
+        if (avoided.includes(ticker)) continue;
+        const ac = (p as any).asset_class;
+        if (!map[ac]) map[ac] = [];
+        map[ac].push(ticker);
+      }
+      return map;
+    };
+
+    const strict = buildByClass(3);
+    const wide   = buildByClass(6); // fallback with wider band
+
     const byClass: Record<string, string[]> = {};
-    for (const [ticker, p] of Object.entries(merged)) {
-      const risk = (p as any).risk_level ?? 5;
-      if (Math.abs(risk - score) > 3) continue;
-      if (excluded.includes((p as any).sector)) continue;
-      if (avoided.includes(ticker)) continue;
-      const ac = (p as any).asset_class;
-      if (!byClass[ac]) byClass[ac] = [];
-      byClass[ac].push(ticker);
+    for (const assetClass of Object.keys(rules)) {
+      byClass[assetClass] = strict[assetClass]?.length ? strict[assetClass] : (wide[assetClass] ?? []);
     }
 
     const result: any[] = [];

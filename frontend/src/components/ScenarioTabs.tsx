@@ -3,32 +3,31 @@ import { getRecommendation } from '../services/api';
 import type { Recommendation, RecommendationItem } from '../types';
 import RecommendationCard from './RecommendationCard';
 import type { AssetPreferences } from '../pages/Dashboard';
+import { buildMockRecommendation, getMockReplacement } from '../mock/data';
 
 interface Props {
   initialData: Recommendation | null;
   onItemsChange?: (items: RecommendationItem[]) => void;
   preferences?: AssetPreferences;
+  riskScore?: number;
 }
 
-export default function ScenarioTabs({ initialData, onItemsChange, preferences = {} }: Props) {
-  const userScore = parseInt(localStorage.getItem('risk_score') || '7', 10);
+export default function ScenarioTabs({ initialData, onItemsChange, preferences = {}, riskScore = 7 }: Props) {
   const scenarios = [
-    { label: 'Conservador',    override: Math.max(1, userScore - 3) },
-    { label: 'Tu perfil',      override: userScore },
-    { label: 'Agresivo',       override: Math.min(10, userScore + 3) },
+    { label: 'Conservador', override: Math.max(1, riskScore - 3) },
+    { label: 'Tu perfil',   override: riskScore },
+    { label: 'Agresivo',    override: Math.min(10, riskScore + 3) },
   ];
 
-  const [activeIdx, setActiveIdx]   = useState(1);
-  const [results, setResults]       = useState<Record<number, Recommendation>>({});
-  const [tabItems, setTabItems]     = useState<Record<number, RecommendationItem[]>>({});
-  const [loading, setLoading]       = useState<Record<number, boolean>>({});
-  const [replacing, setReplacing]   = useState<Record<number, Set<string>>>({});
-  const [excluded, setExcluded]     = useState<Record<number, string[]>>({});
+  const [activeIdx, setActiveIdx] = useState(1);
+  const [tabItems, setTabItems]   = useState<Record<number, RecommendationItem[]>>({});
+  const [loading, setLoading]     = useState<Record<number, boolean>>({});
+  const [replacing, setReplacing] = useState<Record<number, Set<string>>>({});
+  const [excluded, setExcluded]   = useState<Record<number, string[]>>({});
 
-  // Seed tab items when initial data arrives
+  // Seed "Tu perfil" tab when initial data arrives
   useEffect(() => {
     if (initialData) {
-      setResults(prev => ({ ...prev, 1: initialData }));
       setTabItems(prev => ({ ...prev, 1: [...initialData.recommendations] }));
     }
   }, [initialData]);
@@ -44,47 +43,75 @@ export default function ScenarioTabs({ initialData, onItemsChange, preferences =
     if (tabItems[idx]?.length) return;
     setLoading(prev => ({ ...prev, [idx]: true }));
     try {
-      const data = await getRecommendation(scenarios[idx].override, { excludedTickers: excluded[idx] });
-      setResults(prev => ({ ...prev, [idx]: data }));
-      setTabItems(prev => ({ ...prev, [idx]: [...data.recommendations] }));
-    } catch { /* ignore */ } finally {
+      let data: Recommendation | null = null;
+      try {
+        data = await getRecommendation(scenarios[idx].override, { excludedTickers: excluded[idx] });
+      } catch {
+        // network / auth error — data stays null, handled below
+      }
+      // API success but empty payload, or API failure: both fall back to mock
+      if (!data || !data.recommendations?.length) {
+        data = buildMockRecommendation(scenarios[idx].override);
+      }
+      setTabItems(prev => ({ ...prev, [idx]: [...data!.recommendations] }));
+    } finally {
       setLoading(prev => ({ ...prev, [idx]: false }));
     }
   }
 
   async function handleReplace(idx: number, ticker: string) {
+    const currentItems = tabItems[idx] ?? [];
+    const replacedItem = currentItems.find(i => i.ticker === ticker);
+
+    // Mark card as loading
     setReplacing(prev => {
       const s = new Set(prev[idx] ?? []);
       s.add(ticker);
       return { ...prev, [idx]: s };
     });
 
+    // Track dismissed tickers so they never come back
     const newExcluded = [...new Set([...(excluded[idx] ?? []), ticker])];
     setExcluded(prev => ({ ...prev, [idx]: newExcluded }));
 
+    let replacement: RecommendationItem | null = null;
+
     try {
-      // Exclude ALL current tab tickers + dismissed ones so the backend
-      // returns only genuinely fresh alternatives
-      const currentTickers = (tabItems[idx] ?? []).map(i => i.ticker);
-      const allExcluded = [...new Set([...newExcluded, ...currentTickers])];
-
+      // Exclude every ticker currently shown + dismissed ones so the API
+      // returns a genuinely fresh alternative.
+      const allExcluded = [...new Set([...newExcluded, ...currentItems.map(i => i.ticker)])];
       const data = await getRecommendation(scenarios[idx].override, { excludedTickers: allExcluded });
-      const replacement = data.recommendations[0] ?? null;
-
-      setTabItems(prev => {
-        const items = prev[idx] ?? [];
-        if (!replacement) return { ...prev, [idx]: items.filter(i => i.ticker !== ticker) };
-        return { ...prev, [idx]: items.map(i => i.ticker === ticker ? replacement : i) };
-      });
+      replacement = data.recommendations[0] ?? null;
     } catch {
-      setTabItems(prev => ({ ...prev, [idx]: (prev[idx] ?? []).filter(i => i.ticker !== ticker) }));
-    } finally {
-      setReplacing(prev => {
-        const s = new Set(prev[idx] ?? []);
-        s.delete(ticker);
-        return { ...prev, [idx]: s };
-      });
+      // backend unavailable — handled below
     }
+
+    // If API returned nothing or failed, pick from the local mock pool
+    // (same asset class first, then any other class).
+    if (!replacement) {
+      const allExcluded = [...new Set([...newExcluded, ...currentItems.map(i => i.ticker)])];
+      replacement = getMockReplacement(
+        replacedItem?.asset_class ?? 'etf',
+        allExcluded,
+        replacedItem?.allocation_pct ?? 15,
+        scenarios[idx].override,
+      );
+    }
+
+    setTabItems(prev => {
+      const items = prev[idx] ?? [];
+      if (!replacement) {
+        // Exhausted all alternatives — just remove the card
+        return { ...prev, [idx]: items.filter(i => i.ticker !== ticker) };
+      }
+      return { ...prev, [idx]: items.map(i => i.ticker === ticker ? replacement! : i) };
+    });
+
+    setReplacing(prev => {
+      const s = new Set(prev[idx] ?? []);
+      s.delete(ticker);
+      return { ...prev, [idx]: s };
+    });
   }
 
   const currentItems = tabItems[activeIdx] ?? [];

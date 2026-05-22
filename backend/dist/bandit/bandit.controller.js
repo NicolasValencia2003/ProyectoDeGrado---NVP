@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BanditController = void 0;
 const common_1 = require("@nestjs/common");
 const bandit_service_1 = require("./bandit.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const current_user_decorator_1 = require("../common/current-user.decorator");
 let BanditController = class BanditController {
     bandit;
@@ -36,7 +35,6 @@ __decorate([
 ], BanditController.prototype, "getProfile", null);
 exports.BanditController = BanditController = __decorate([
     (0, common_1.Controller)('bandit'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [bandit_service_1.BanditService])
 ], BanditController);
 //# sourceMappingURL=bandit.controller.js.map

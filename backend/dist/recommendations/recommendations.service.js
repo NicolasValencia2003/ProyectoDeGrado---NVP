@@ -18,7 +18,6 @@ const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const supabase_service_1 = require("../supabase/supabase.service");
 const market_data_fetcher_service_1 = require("../market/market-data-fetcher.service");
 const life_profile_service_1 = require("../portfolio/life-profile.service");
-const mock_data_1 = require("../mock/mock-data");
 const bandit_service_1 = require("../bandit/bandit.service");
 const ALLOCATION_RULES = {
     conservative: { bond: 0.55, cash: 0.10, etf: 0.25, reit: 0.05, commodity: 0.05, stock: 0, crypto: 0 },
@@ -30,6 +29,7 @@ let RecommendationsService = class RecommendationsService {
     supabase;
     marketFetcher;
     bandit;
+    logger = new common_1.Logger('RecommendationsService');
     anthropic = null;
     constructor(supabase, marketFetcher, bandit) {
         this.supabase = supabase;
@@ -45,7 +45,7 @@ let RecommendationsService = class RecommendationsService {
         let prefs = null;
         const timeout = (ms, fallback, p) => Promise.race([p, new Promise(r => setTimeout(() => r(fallback), ms))]);
         const [pricesMap, sentiment, ucbScores] = await Promise.all([
-            timeout(10000, this.marketFetcher['buildFallbackPrices'](), this.marketFetcher.getPricesWithRefresh()),
+            timeout(10000, {}, this.marketFetcher.getPricesWithRefresh()),
             timeout(5000, {}, this.marketFetcher.getSentimentWithRefresh()),
             timeout(5000, {}, this.bandit.getScores(user.id ?? '')),
         ]);
@@ -59,13 +59,10 @@ let RecommendationsService = class RecommendationsService {
             catch { }
         }
         const candidates = this.buildCandidates(score, pricesMap, user, prefs, excludedTickers, ucbScores);
-        let result;
-        if (this.anthropic) {
-            result = await this.generateWithClaude(user, prefs, candidates, pricesMap, sentiment, score, excludedTickers);
+        if (!this.anthropic) {
+            throw new common_1.ServiceUnavailableException('El servicio de recomendaciones no está configurado. Contacta al administrador.');
         }
-        else {
-            result = this.generateMock(score, pricesMap, excludedTickers, candidates);
-        }
+        const result = await this.generateWithClaude(user, prefs, candidates, pricesMap, sentiment, score, excludedTickers);
         if (excludedTickers.length > 0) {
             result.recommendations = (result.recommendations ?? []).filter((r) => !excludedTickers.includes(r.ticker));
         }
@@ -157,80 +154,54 @@ Reemplaza el ejemplo con los tickers REALES del portafolio pre-calculado:
                 key_risk: r.key_concept ?? r.key_risk,
             }));
             if (this.supabase.isConfigured() && user.id) {
-                void this.supabase.db.from('recommendation_history').insert({
+                const { error: histErr } = await this.supabase.db.from('recommendation_history').insert({
                     user_id: user.id,
                     risk_score_used: score,
                     payload: parsed,
                     market_snapshot: {
-                        fear_greed: sentiment?.fear_greed ?? 62,
-                        fear_greed_label: sentiment?.fear_greed_label ?? 'Neutral',
-                        treasury_10y: sentiment?.treasury_10y ?? 4.42,
+                        fear_greed: sentiment?.fear_greed ?? null,
+                        fear_greed_label: sentiment?.fear_greed_label ?? null,
+                        treasury_10y: sentiment?.treasury_10y ?? null,
                     },
                 });
+                if (histErr)
+                    this.logger.error(`recommendation_history insert failed: ${histErr.message}`);
             }
             return parsed;
         }
         catch (err) {
-            console.error('Claude error, using mock fallback:', err.message);
-            return this.generateMock(score, pricesMap, excludedTickers);
+            const msg = err.message;
+            throw new common_1.ServiceUnavailableException(`Error al generar recomendaciones: ${msg}`);
         }
-    }
-    generateMock(score, pricesMap, excludedTickers = [], candidates = []) {
-        let band;
-        if (score <= 3)
-            band = 'conservative';
-        else if (score <= 8)
-            band = 'balanced';
-        else
-            band = 'aggressive';
-        const base = mock_data_1.MOCK_RECOMMENDATIONS[band];
-        const baseFiltered = base.recommendations.filter((r) => !excludedTickers.includes(r.ticker));
-        const baseTickers = new Set(baseFiltered.map((r) => r.ticker));
-        const extras = candidates
-            .filter(c => !baseTickers.has(c.ticker) && !excludedTickers.includes(c.ticker))
-            .map(c => ({
-            ticker: c.ticker,
-            name: c.name,
-            allocation_pct: c.allocation_pct,
-            current_price: c.current_price ?? null,
-            change_1d_pct: c.change_1d_pct ?? null,
-            asset_class: c.asset_class,
-            sector: c.sector,
-            rationale: `${c.name} es relevante para tu perfil como ejemplo educativo de activos de clase ${c.asset_class}. Su inclusión ilustra el principio de diversificación entre distintas clases de activos.`,
-            key_risk: `Como todo activo de tipo ${c.asset_class}, presenta riesgos propios de su categoría que es importante comprender antes de invertir.`,
-        }));
-        return {
-            ...base,
-            recommendations: [
-                ...baseFiltered.map((r) => ({
-                    ...r,
-                    current_price: pricesMap[r.ticker]?.price ?? r.current_price,
-                    change_1d_pct: pricesMap[r.ticker]?.change_1d_pct ?? r.change_1d_pct,
-                    key_risk: r.key_risk ?? r.key_concept,
-                })),
-                ...extras,
-            ],
-        };
     }
     buildCandidates(score, pricesMap, user, prefs, extraExcluded = [], ucbScores = {}) {
         const band = score <= 3 ? 'conservative' : score <= 6 ? 'balanced' : score <= 8 ? 'growth' : 'aggressive';
         const rules = ALLOCATION_RULES[band];
-        const excluded = user.excluded_sectors ?? [];
+        const excluded = [...(prefs?.excluded_sectors ?? []), ...(user.excluded_sectors ?? [])];
         const avoided = [...(prefs?.avoided_tickers ?? []), ...extraExcluded];
         const merged = { ...pricesMap };
+        const buildByClass = (tolerance) => {
+            const map = {};
+            for (const [ticker, p] of Object.entries(merged)) {
+                const risk = p.risk_level ?? 5;
+                if (Math.abs(risk - score) > tolerance)
+                    continue;
+                if (excluded.includes(p.sector))
+                    continue;
+                if (avoided.includes(ticker))
+                    continue;
+                const ac = p.asset_class;
+                if (!map[ac])
+                    map[ac] = [];
+                map[ac].push(ticker);
+            }
+            return map;
+        };
+        const strict = buildByClass(3);
+        const wide = buildByClass(6);
         const byClass = {};
-        for (const [ticker, p] of Object.entries(merged)) {
-            const risk = p.risk_level ?? 5;
-            if (Math.abs(risk - score) > 3)
-                continue;
-            if (excluded.includes(p.sector))
-                continue;
-            if (avoided.includes(ticker))
-                continue;
-            const ac = p.asset_class;
-            if (!byClass[ac])
-                byClass[ac] = [];
-            byClass[ac].push(ticker);
+        for (const assetClass of Object.keys(rules)) {
+            byClass[assetClass] = strict[assetClass]?.length ? strict[assetClass] : (wide[assetClass] ?? []);
         }
         const result = [];
         for (const [assetClass, weight] of Object.entries(rules)) {

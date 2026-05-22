@@ -49,7 +49,7 @@ let ChatService = class ChatService {
     }
     async chat(messages) {
         if (!this.anthropic) {
-            return { reply: this.getMockReply(messages[messages.length - 1]?.content ?? '') };
+            return { reply: 'El asistente no está disponible en este momento. Por favor intenta más tarde.' };
         }
         try {
             const response = await this.anthropic.messages.create({
@@ -63,20 +63,8 @@ let ChatService = class ChatService {
         }
         catch (err) {
             console.error('[ChatService] Claude error:', err.message);
-            return { reply: this.getMockReply(messages[messages.length - 1]?.content ?? '') };
+            return { reply: 'Hubo un error al procesar tu mensaje. Por favor intenta de nuevo.' };
         }
-    }
-    getMockReply(question) {
-        const q = question.toLowerCase();
-        if (q.includes('diversif'))
-            return MOCK_RESPONSES.diversificacion;
-        if (q.includes('riesgo') || q.includes('risk'))
-            return MOCK_RESPONSES.riesgo;
-        if (q.includes('etf') || q.includes('fondo'))
-            return MOCK_RESPONSES.etf;
-        if (q.includes('bitcoin') || q.includes('cripto'))
-            return MOCK_RESPONSES.bitcoin;
-        return MOCK_RESPONSES.default;
     }
 };
 exports.ChatService = ChatService;

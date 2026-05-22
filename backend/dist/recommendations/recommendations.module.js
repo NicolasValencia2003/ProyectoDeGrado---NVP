@@ -10,7 +10,6 @@ exports.RecommendationsModule = void 0;
 const common_1 = require("@nestjs/common");
 const recommendations_controller_1 = require("./recommendations.controller");
 const recommendations_service_1 = require("./recommendations.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const market_data_fetcher_service_1 = require("../market/market-data-fetcher.service");
 const bandit_module_1 = require("../bandit/bandit.module");
 let RecommendationsModule = class RecommendationsModule {
@@ -20,7 +19,7 @@ exports.RecommendationsModule = RecommendationsModule = __decorate([
     (0, common_1.Module)({
         imports: [bandit_module_1.BanditModule],
         controllers: [recommendations_controller_1.RecommendationsController],
-        providers: [recommendations_service_1.RecommendationsService, mock_auth_guard_1.MockAuthGuard, market_data_fetcher_service_1.MarketDataFetcherService],
+        providers: [recommendations_service_1.RecommendationsService, market_data_fetcher_service_1.MarketDataFetcherService],
     })
 ], RecommendationsModule);
 //# sourceMappingURL=recommendations.module.js.map

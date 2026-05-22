@@ -10,11 +10,10 @@ exports.HistoryModule = void 0;
 const common_1 = require("@nestjs/common");
 const history_controller_1 = require("./history.controller");
 const history_service_1 = require("./history.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 let HistoryModule = class HistoryModule {
 };
 exports.HistoryModule = HistoryModule;
 exports.HistoryModule = HistoryModule = __decorate([
-    (0, common_1.Module)({ controllers: [history_controller_1.HistoryController], providers: [history_service_1.HistoryService, mock_auth_guard_1.MockAuthGuard] })
+    (0, common_1.Module)({ controllers: [history_controller_1.HistoryController], providers: [history_service_1.HistoryService] })
 ], HistoryModule);
 //# sourceMappingURL=history.module.js.map

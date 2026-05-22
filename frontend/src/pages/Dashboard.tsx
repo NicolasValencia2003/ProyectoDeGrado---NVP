@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Recommendation, RecommendationItem, BiasAnalysisResult } from '../types';
 import { dashboardCache } from '../lib/dashboardCache';
+import { buildMockRecommendation } from '../mock/data';
 import LiveStrip from '../components/LiveStrip';
 import ScenarioTabs from '../components/ScenarioTabs';
 import PersonalizationProgress from '../components/PersonalizationProgress';
@@ -58,14 +59,19 @@ export default function Dashboard() {
     }
 
     const timer = setTimeout(async () => {
+      let result: Recommendation;
       try {
-        const result = await getRecommendation(riskScore);
-        dashboardCache.set(result);
-        setData(result);
-        setActiveItems(result.recommendations);
+        result = await getRecommendation(riskScore);
         logBehaviorEvent('recommendation_requested', { asset_class: 'portfolio', sector: 'broad_market' });
-      } catch { /* backend always responds; log is enough */ }
-      finally { setLoading(false); }
+      } catch {
+        // The dashboard must always show data — fall back to an educational mock portfolio
+        // when the backend or Anthropic API is unavailable.
+        result = buildMockRecommendation(riskScore);
+      }
+      dashboardCache.set(result);
+      setData(result);
+      setActiveItems(result.recommendations);
+      setLoading(false);
     }, 1500);
 
     return () => clearTimeout(timer);
@@ -142,7 +148,7 @@ export default function Dashboard() {
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
         ) : (
-          <ScenarioTabs initialData={data} onItemsChange={setActiveItems} preferences={preferences} />
+          <ScenarioTabs initialData={data} onItemsChange={setActiveItems} preferences={preferences} riskScore={riskScore} />
         )}
       </div>
 

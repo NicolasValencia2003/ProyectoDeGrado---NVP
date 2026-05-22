@@ -5,10 +5,10 @@ export declare class RecommendationsService {
     private supabase;
     private marketFetcher;
     private bandit;
+    private readonly logger;
     private anthropic;
     constructor(supabase: SupabaseService, marketFetcher: MarketDataFetcherService, bandit: BanditService);
     generate(user: any, riskOverride?: number, excludedTickers?: string[]): Promise<any>;
     private generateWithClaude;
-    private generateMock;
     private buildCandidates;
 }

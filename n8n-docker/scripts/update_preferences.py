@@ -43,7 +43,7 @@ def main():
         print(f"No events for {args.user_id}")
         return
 
-    user = sb.table("users").select("horizon,age_group,occupation_type") \
+    user = sb.table("profiles").select("age_group,occupation_type") \
               .eq("id", args.user_id).execute().data
     user = user[0] if user else {}
     horizon = user.get("horizon", "3-5y")

@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
 const config_1 = require("@nestjs/config");
 const supabase_module_1 = require("./supabase/supabase.module");
 const market_module_1 = require("./market/market.module");
@@ -18,6 +19,7 @@ const history_module_1 = require("./history/history.module");
 const survey_module_1 = require("./survey/survey.module");
 const chat_module_1 = require("./chat/chat.module");
 const bias_module_1 = require("./bias/bias.module");
+const supabase_auth_guard_1 = require("./common/supabase-auth.guard");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -34,6 +36,12 @@ exports.AppModule = AppModule = __decorate([
             survey_module_1.SurveyModule,
             chat_module_1.ChatModule,
             bias_module_1.BiasModule,
+        ],
+        providers: [
+            {
+                provide: core_1.APP_GUARD,
+                useClass: supabase_auth_guard_1.SupabaseAuthGuard,
+            },
         ],
     })
 ], AppModule);

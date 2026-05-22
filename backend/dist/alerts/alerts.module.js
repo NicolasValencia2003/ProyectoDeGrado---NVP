@@ -10,11 +10,15 @@ exports.AlertsModule = void 0;
 const common_1 = require("@nestjs/common");
 const alerts_controller_1 = require("./alerts.controller");
 const alerts_service_1 = require("./alerts.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
+const supabase_module_1 = require("../supabase/supabase.module");
 let AlertsModule = class AlertsModule {
 };
 exports.AlertsModule = AlertsModule;
 exports.AlertsModule = AlertsModule = __decorate([
-    (0, common_1.Module)({ controllers: [alerts_controller_1.AlertsController], providers: [alerts_service_1.AlertsService, mock_auth_guard_1.MockAuthGuard] })
+    (0, common_1.Module)({
+        imports: [supabase_module_1.SupabaseModule],
+        controllers: [alerts_controller_1.AlertsController],
+        providers: [alerts_service_1.AlertsService],
+    })
 ], AlertsModule);
 //# sourceMappingURL=alerts.module.js.map

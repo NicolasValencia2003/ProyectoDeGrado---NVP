@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileLoaded } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [mode, setMode]       = useState<'login' | 'register'>('login');
@@ -14,15 +14,20 @@ export default function Landing() {
   const [error, setError]     = useState('');
   const [busy, setBusy]       = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated.
+  // Wait for both auth loading and profile loading to complete before redirecting
+  // so we never navigate based on a stale null profile while the fetch is in flight.
   useEffect(() => {
-    if (loading) return;
-    if (user && profile) {
-      if (!profile.academic_disclaimer_accepted) navigate('/disclaimer', { replace: true });
-      else if (!profile.risk_score) navigate('/onboarding', { replace: true });
-      else navigate('/dashboard', { replace: true });
+    if (loading || !profileLoaded) return;
+    if (!user) return;
+    if (!profile || !profile.academic_disclaimer_accepted) {
+      navigate('/disclaimer', { replace: true });
+    } else if (!profile.risk_score) {
+      navigate('/onboarding', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
     }
-  }, [user, profile, loading, navigate]);
+  }, [user, profile, loading, profileLoaded, navigate]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

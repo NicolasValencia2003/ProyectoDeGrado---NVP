@@ -96,10 +96,25 @@ let BiasDetectionService = class BiasDetectionService {
                 ...BIAS_DEFS[key],
                 evidence: this.buildEvidence(key, allEvents, profile),
             }));
+            const biasMap = active.length > 0
+                ? Object.fromEntries(active.map(b => [b.key, { score: b.score, prompt_instruction: b.prompt_instruction }]))
+                : {};
+            const { error: prefErr } = await this.supabase.db.from('user_preferences')
+                .upsert({ user_id: userId, detected_biases: biasMap, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+            if (prefErr)
+                this.log.warn(`user_preferences upsert failed: ${prefErr.message}`);
             if (active.length > 0) {
-                const biasMap = Object.fromEntries(active.map(b => [b.key, { score: b.score, prompt_instruction: b.prompt_instruction }]));
-                await this.supabase.db.from('user_preferences')
-                    .upsert({ user_id: userId, detected_biases: biasMap, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+                const interventions = active.map(b => ({
+                    user_id: userId,
+                    bias_type: b.key,
+                    strength: b.score,
+                    detected_at: new Date().toISOString(),
+                }));
+                const { error: intErr } = await this.supabase.db
+                    .from('bias_interventions')
+                    .insert(interventions);
+                if (intErr)
+                    this.log.warn(`bias_interventions insert failed: ${intErr.message}`);
             }
             this.log.log(`Bias analysis [${userId.slice(0, 8)}]: ${active.map(b => b.key).join(', ') || 'none detected'}`);
             return { scores, active, last_updated: new Date().toISOString() };

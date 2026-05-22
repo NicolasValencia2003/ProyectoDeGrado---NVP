@@ -10,11 +10,10 @@ exports.EventsModule = void 0;
 const common_1 = require("@nestjs/common");
 const events_controller_1 = require("./events.controller");
 const events_service_1 = require("./events.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 let EventsModule = class EventsModule {
 };
 exports.EventsModule = EventsModule;
 exports.EventsModule = EventsModule = __decorate([
-    (0, common_1.Module)({ controllers: [events_controller_1.EventsController], providers: [events_service_1.EventsService, mock_auth_guard_1.MockAuthGuard] })
+    (0, common_1.Module)({ controllers: [events_controller_1.EventsController], providers: [events_service_1.EventsService] })
 ], EventsModule);
 //# sourceMappingURL=events.module.js.map

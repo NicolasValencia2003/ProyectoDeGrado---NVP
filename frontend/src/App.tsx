@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Landing from './pages/Landing';
 import Onboarding from './pages/Onboarding';
@@ -12,8 +12,10 @@ import Chat from './pages/Chat';
 import NotificationBell from './components/NotificationBell';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth();
-  if (loading) return (
+  const { user, profile, loading, profileLoaded } = useAuth();
+  // Wait for both auth and profile to settle before deciding where to send the user —
+  // otherwise an existing user gets bounced to /disclaimer while the profile is still loading.
+  if (loading || !profileLoaded) return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
       Cargando...
     </div>
@@ -34,7 +36,13 @@ const NAV_ITEMS = [
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+
+  function handleSignOut() {
+    signOut();
+    navigate('/', { replace: true });
+  }
   const noLayout = ['/', '/disclaimer', '/onboarding', '/encuesta'].some(p =>
     location.pathname === p || location.pathname.startsWith('/encuesta')
   );
@@ -76,7 +84,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               Perfil riesgo: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{profile.risk_score}/10</span>
             </div>
           )}
-          <button onClick={signOut} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+          <button onClick={handleSignOut} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
             Cerrar sesión
           </button>
         </div>

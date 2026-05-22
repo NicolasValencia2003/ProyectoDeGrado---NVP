@@ -10,11 +10,10 @@ exports.SurveyModule = void 0;
 const common_1 = require("@nestjs/common");
 const survey_controller_1 = require("./survey.controller");
 const survey_service_1 = require("./survey.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 let SurveyModule = class SurveyModule {
 };
 exports.SurveyModule = SurveyModule;
 exports.SurveyModule = SurveyModule = __decorate([
-    (0, common_1.Module)({ controllers: [survey_controller_1.SurveyController], providers: [survey_service_1.SurveyService, mock_auth_guard_1.MockAuthGuard] })
+    (0, common_1.Module)({ controllers: [survey_controller_1.SurveyController], providers: [survey_service_1.SurveyService] })
 ], SurveyModule);
 //# sourceMappingURL=survey.module.js.map

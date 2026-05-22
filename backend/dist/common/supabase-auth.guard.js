@@ -9,10 +9,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MockAuthGuard = void 0;
+exports.SupabaseAuthGuard = void 0;
 const common_1 = require("@nestjs/common");
 const supabase_service_1 = require("../supabase/supabase.service");
-let MockAuthGuard = class MockAuthGuard {
+let SupabaseAuthGuard = class SupabaseAuthGuard {
     supabase;
     constructor(supabase) {
         this.supabase = supabase;
@@ -21,20 +21,20 @@ let MockAuthGuard = class MockAuthGuard {
         const request = context.switchToHttp().getRequest();
         const authHeader = request.headers.authorization ?? '';
         const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-        if (token && this.supabase.isConfigured()) {
-            const { data: { user } } = await this.supabase.db.auth.getUser(token);
-            if (user) {
-                request.user = user;
-                return true;
-            }
+        if (!token || !this.supabase.isConfigured()) {
+            throw new common_1.UnauthorizedException('Authentication required');
         }
-        request.user = { id: null, email: 'demo@finvise.edu' };
+        const { data: { user }, error } = await this.supabase.db.auth.getUser(token);
+        if (error || !user) {
+            throw new common_1.UnauthorizedException('Invalid or expired token');
+        }
+        request.user = user;
         return true;
     }
 };
-exports.MockAuthGuard = MockAuthGuard;
-exports.MockAuthGuard = MockAuthGuard = __decorate([
+exports.SupabaseAuthGuard = SupabaseAuthGuard;
+exports.SupabaseAuthGuard = SupabaseAuthGuard = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [supabase_service_1.SupabaseService])
-], MockAuthGuard);
-//# sourceMappingURL=mock-auth.guard.js.map
+], SupabaseAuthGuard);
+//# sourceMappingURL=supabase-auth.guard.js.map

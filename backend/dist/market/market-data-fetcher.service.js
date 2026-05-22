@@ -16,7 +16,6 @@ exports.MarketDataFetcherService = void 0;
 const common_1 = require("@nestjs/common");
 const axios_1 = __importDefault(require("axios"));
 const supabase_service_1 = require("../supabase/supabase.service");
-const mock_data_1 = require("../mock/mock-data");
 const TICKER_META = {
     SPY: { name: 'S&P 500 ETF', asset_class: 'etf', sector: 'broad_market', risk_level: 5 },
     IVV: { name: 'iShares S&P 500', asset_class: 'etf', sector: 'broad_market', risk_level: 5 },
@@ -112,56 +111,58 @@ let MarketDataFetcherService = class MarketDataFetcherService {
         if (this.memPrices && Date.now() - this.memPricesAt < MEM_CACHE_TTL_MS) {
             return this.memPrices;
         }
-        const base = this.buildFallbackPrices();
+        const result = {};
         try {
             const cryptoResult = await this.fetchCryptoPrices().catch(() => ({}));
-            Object.assign(base, cryptoResult);
+            Object.assign(result, cryptoResult);
             if (this.supabase.isConfigured()) {
-                const { data: cached } = await this.supabase.db
-                    .from('prices_cache')
-                    .select('*')
-                    .not('ticker', 'in', `(${Object.keys(CRYPTO_TICKERS).map(t => `"${t}"`).join(',')})`)
-                    .order('updated_at', { ascending: false })
-                    .limit(1);
-                const isFresh = cached?.length && !this.isStale(cached[0]?.updated_at, PRICES_TTL_MS);
-                if (isFresh) {
-                    const { data: allCached } = await this.supabase.db.from('prices_cache').select('*');
-                    if (allCached?.length) {
-                        const cachedMap = Object.fromEntries(allCached.map((p) => [p.ticker, p]));
-                        this.log.log(`Stocks from Supabase cache + CoinGecko crypto`);
-                        const result = { ...base, ...cachedMap, ...cryptoResult };
-                        this.memPrices = result;
-                        this.memPricesAt = Date.now();
-                        return result;
+                const { data: allCached } = await this.supabase.db.from('prices_cache').select('*');
+                if (allCached?.length) {
+                    const cachedMap = Object.fromEntries(allCached.map((p) => [p.ticker, p]));
+                    Object.assign(result, cachedMap, cryptoResult);
+                    this.log.log(`Prices from Supabase cache (${allCached.length} tickers) + CoinGecko crypto`);
+                    const sample = allCached.find((p) => !CRYPTO_TICKERS[p.ticker]);
+                    if (sample && this.isStale(sample.updated_at, PRICES_TTL_MS)) {
+                        this.refreshStockPricesInBackground(cryptoResult);
                     }
+                    this.memPrices = result;
+                    this.memPricesAt = Date.now();
+                    return result;
                 }
-                this.log.log('Fetching fresh stock prices...');
-                let timeoutId;
-                const freshStocks = await Promise.race([
-                    this.fetchStockPrices().finally(() => clearTimeout(timeoutId)),
-                    new Promise(resolve => {
-                        timeoutId = setTimeout(() => {
-                            this.log.warn('Stock fetch timed out after 25s — caching fallback prices');
-                            resolve({});
-                        }, 25000);
-                    }),
-                ]);
-                if (Object.keys(freshStocks).length > 0) {
-                    Object.assign(base, freshStocks);
+            }
+            this.log.log('Supabase cache empty — fetching live stock prices...');
+            let timeoutId;
+            const freshStocks = await Promise.race([
+                this.fetchStockPrices().finally(() => clearTimeout(timeoutId)),
+                new Promise(resolve => {
+                    timeoutId = setTimeout(() => resolve({}), 25000);
+                }),
+            ]);
+            if (Object.keys(freshStocks).length > 0) {
+                Object.assign(result, freshStocks);
+                if (this.supabase.isConfigured()) {
                     await this.savePricesToSupabase({ ...freshStocks, ...cryptoResult });
                 }
-                else {
-                    this.log.log('Caching fallback prices to avoid repeated API calls');
-                    await this.savePricesToSupabase({ ...base, ...cryptoResult });
-                }
+            }
+            else {
+                this.log.warn('Stock APIs unavailable and cache empty — no price data available');
             }
         }
         catch (err) {
             this.log.warn('Price pipeline error: ' + err.message);
         }
-        this.memPrices = base;
+        this.memPrices = result;
         this.memPricesAt = Date.now();
-        return base;
+        return result;
+    }
+    refreshStockPricesInBackground(cryptoResult) {
+        this.fetchStockPrices()
+            .then(fresh => {
+            if (Object.keys(fresh).length > 0 && this.supabase.isConfigured()) {
+                return this.savePricesToSupabase({ ...fresh, ...cryptoResult });
+            }
+        })
+            .catch(err => this.log.warn('Background price refresh failed: ' + err.message));
     }
     async fetchStockPrices() {
         const apiKey = process.env.TWELVE_DATA_KEY;
@@ -288,13 +289,13 @@ let MarketDataFetcherService = class MarketDataFetcherService {
             try {
                 const { data } = await this.supabase.db
                     .from('sentiment_cache').select('*').eq('id', 1).single();
-                if (data && !this.isStale(data.updated_at, SENTIMENT_TTL_MS)) {
-                    return {
-                        ...data,
-                        top_headlines: typeof data.top_headlines === 'string'
-                            ? JSON.parse(data.top_headlines)
-                            : data.top_headlines,
-                    };
+                if (data) {
+                    if (this.isStale(data.updated_at, SENTIMENT_TTL_MS)) {
+                        this.fetchSentiment()
+                            .then(fresh => this.saveSentimentToSupabase(fresh))
+                            .catch(err => this.log.warn('Background sentiment refresh: ' + err.message));
+                    }
+                    return { ...data };
                 }
                 const fresh = await this.fetchSentiment();
                 await this.saveSentimentToSupabase(fresh);
@@ -304,7 +305,12 @@ let MarketDataFetcherService = class MarketDataFetcherService {
                 this.log.warn('Sentiment error: ' + err.message);
             }
         }
-        return { ...mock_data_1.MOCK_SENTIMENT };
+        try {
+            return await this.fetchSentiment();
+        }
+        catch {
+            return {};
+        }
     }
     async fetchSentiment() {
         const [fg, ty, hl] = await Promise.allSettled([
@@ -313,10 +319,10 @@ let MarketDataFetcherService = class MarketDataFetcherService {
             this.fetchHeadlines(),
         ]);
         return {
-            fear_greed: fg.status === 'fulfilled' ? fg.value.value : 50,
-            fear_greed_label: fg.status === 'fulfilled' ? fg.value.label : 'Neutral',
-            treasury_10y: ty.status === 'fulfilled' ? ty.value : 4.42,
-            top_headlines: hl.status === 'fulfilled' ? hl.value : mock_data_1.MOCK_SENTIMENT.top_headlines,
+            fear_greed: fg.status === 'fulfilled' ? fg.value.value : null,
+            fear_greed_label: fg.status === 'fulfilled' ? fg.value.label : null,
+            treasury_10y: ty.status === 'fulfilled' ? ty.value : null,
+            top_headlines: hl.status === 'fulfilled' ? hl.value : [],
             updated_at: new Date().toISOString(),
         };
     }
@@ -330,15 +336,17 @@ let MarketDataFetcherService = class MarketDataFetcherService {
     async fetchTreasury10Y() {
         const key = process.env.FRED_API_KEY;
         if (!key)
-            return 4.42;
+            throw new Error('FRED_API_KEY not configured');
         const { data } = await axios_1.default.get(`https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${key}&limit=5&sort_order=desc&file_type=json`, { timeout: 8000 });
         const obs = (data?.observations ?? []).find((o) => o.value !== '.' && o.value !== '');
-        return obs ? parseFloat(obs.value) : 4.42;
+        if (!obs)
+            throw new Error('No valid treasury data in FRED response');
+        return parseFloat(obs.value);
     }
     async fetchHeadlines() {
-        const key = process.env.NEWSAPI_KEY;
+        const key = process.env.NEWSAPI_KEY ?? process.env.NEWS_API_KEY;
         if (!key)
-            return mock_data_1.MOCK_SENTIMENT.top_headlines;
+            throw new Error('NEWS_API_KEY not configured');
         const { data } = await axios_1.default.get(`https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=5&apiKey=${key}`, { timeout: 8000 });
         return (data?.articles ?? []).slice(0, 5).map((a) => a.title).filter(Boolean);
     }
@@ -348,7 +356,7 @@ let MarketDataFetcherService = class MarketDataFetcherService {
             fear_greed: sentiment.fear_greed,
             fear_greed_label: sentiment.fear_greed_label,
             treasury_10y: sentiment.treasury_10y,
-            top_headlines: JSON.stringify(sentiment.top_headlines),
+            top_headlines: sentiment.top_headlines,
             updated_at: new Date().toISOString(),
         }, { onConflict: 'id' });
         if (error)

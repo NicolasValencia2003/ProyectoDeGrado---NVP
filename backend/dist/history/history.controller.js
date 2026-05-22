@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HistoryController = void 0;
 const common_1 = require("@nestjs/common");
 const history_service_1 = require("./history.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const current_user_decorator_1 = require("../common/current-user.decorator");
 let HistoryController = class HistoryController {
     historyService;
@@ -36,7 +35,6 @@ __decorate([
 ], HistoryController.prototype, "getAll", null);
 exports.HistoryController = HistoryController = __decorate([
     (0, common_1.Controller)('history'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [history_service_1.HistoryService])
 ], HistoryController);
 //# sourceMappingURL=history.controller.js.map

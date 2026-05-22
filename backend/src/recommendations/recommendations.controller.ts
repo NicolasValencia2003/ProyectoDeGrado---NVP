@@ -1,10 +1,8 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
-import { MockAuthGuard } from '../common/mock-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('recommendations')
-@UseGuards(MockAuthGuard)
 export class RecommendationsController {
   constructor(private readonly recommendationsService: RecommendationsService) {}
 

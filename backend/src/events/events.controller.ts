@@ -1,9 +1,7 @@
-import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { MockAuthGuard } from '../common/mock-auth.guard';
+import { Controller, Post, Body, Request } from '@nestjs/common';
 import { EventsService } from './events.service';
 
 @Controller('events')
-@UseGuards(MockAuthGuard)
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 

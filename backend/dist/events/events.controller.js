@@ -14,7 +14,6 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EventsController = void 0;
 const common_1 = require("@nestjs/common");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const events_service_1 = require("./events.service");
 let EventsController = class EventsController {
     eventsService;
@@ -36,7 +35,6 @@ __decorate([
 ], EventsController.prototype, "log", null);
 exports.EventsController = EventsController = __decorate([
     (0, common_1.Controller)('events'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [events_service_1.EventsService])
 ], EventsController);
 //# sourceMappingURL=events.controller.js.map

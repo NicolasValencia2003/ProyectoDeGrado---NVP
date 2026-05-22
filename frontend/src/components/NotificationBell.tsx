@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { getAlerts, markAlertRead } from '../services/api';
 import type { MarketAlert } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -17,6 +18,7 @@ const SEVERITY_COLOR: Record<string, string> = {
 };
 
 export default function NotificationBell() {
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState<MarketAlert[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -33,7 +35,7 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const unread = alerts.filter(a => !a.read_by.includes('mock-user-001'));
+  const unread = alerts.filter(a => !a.read_by.includes(user?.id ?? ''));
 
   async function handleOpen() {
     setOpen(!open);
@@ -41,7 +43,7 @@ export default function NotificationBell() {
       for (const alert of unread) {
         try { await markAlertRead(alert.id); } catch { /* ignore */ }
       }
-      setAlerts(prev => prev.map(a => ({ ...a, read_by: [...new Set([...a.read_by, 'mock-user-001'])] })));
+      setAlerts(prev => prev.map(a => ({ ...a, read_by: [...new Set([...a.read_by, user?.id ?? ''])] })));
     }
   }
 

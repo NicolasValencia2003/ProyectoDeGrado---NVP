@@ -29,7 +29,7 @@ export const logEvent = (event: UserEvent): Promise<{ ok: boolean }> =>
 export const getAlerts = (): Promise<MarketAlert[]> =>
   api.get('/alerts').then(r => r.data);
 
-export const markAlertRead = (id: number): Promise<void> =>
+export const markAlertRead = (id: string): Promise<void> =>
   api.patch(`/alerts/${id}/read`).then(r => r.data);
 
 export const getHistory = (): Promise<HistoryEntry[]> =>

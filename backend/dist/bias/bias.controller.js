@@ -14,7 +14,6 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BiasController = void 0;
 const common_1 = require("@nestjs/common");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 const bias_detection_service_1 = require("./bias-detection.service");
 let BiasController = class BiasController {
     biasService;
@@ -35,7 +34,6 @@ __decorate([
 ], BiasController.prototype, "getAnalysis", null);
 exports.BiasController = BiasController = __decorate([
     (0, common_1.Controller)('bias'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [bias_detection_service_1.BiasDetectionService])
 ], BiasController);
 //# sourceMappingURL=bias.controller.js.map

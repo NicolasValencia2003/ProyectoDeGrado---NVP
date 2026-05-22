@@ -6,6 +6,7 @@ export declare class MarketDataFetcherService {
     private memPricesAt;
     constructor(supabase: SupabaseService);
     getPricesWithRefresh(): Promise<Record<string, any>>;
+    private refreshStockPricesInBackground;
     private fetchStockPrices;
     private fetchStockPricesTwelveData;
     private fetchStockPricesYahoo;

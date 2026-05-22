@@ -7,5 +7,4 @@ export declare class ChatService {
     }[]): Promise<{
         reply: string;
     }>;
-    private getMockReply;
 }

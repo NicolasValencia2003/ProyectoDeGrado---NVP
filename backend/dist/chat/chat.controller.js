@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatController = void 0;
 const common_1 = require("@nestjs/common");
 const chat_service_1 = require("./chat.service");
-const mock_auth_guard_1 = require("../common/mock-auth.guard");
 let ChatController = class ChatController {
     chatService;
     constructor(chatService) {
@@ -35,7 +34,6 @@ __decorate([
 ], ChatController.prototype, "chat", null);
 exports.ChatController = ChatController = __decorate([
     (0, common_1.Controller)('chat'),
-    (0, common_1.UseGuards)(mock_auth_guard_1.MockAuthGuard),
     __metadata("design:paramtypes", [chat_service_1.ChatService])
 ], ChatController);
 //# sourceMappingURL=chat.controller.js.map

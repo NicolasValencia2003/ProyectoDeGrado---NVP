@@ -28,7 +28,7 @@ export interface PriceCache {
 }
 
 export interface MarketAlert {
-  id: number;
+  id: string;
   condition_name: string;
   severity: 'info' | 'warning' | 'danger';
   message: string;

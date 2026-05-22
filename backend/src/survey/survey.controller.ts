@@ -1,10 +1,8 @@
-import { Controller, Post, Get, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query } from '@nestjs/common';
 import { SurveyService } from './survey.service';
-import { MockAuthGuard } from '../common/mock-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('survey')
-@UseGuards(MockAuthGuard)
 export class SurveyController {
   constructor(private readonly surveyService: SurveyService) {}
 

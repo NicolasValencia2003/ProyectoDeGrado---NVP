@@ -1,10 +1,8 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { BanditService } from './bandit.service';
-import { MockAuthGuard } from '../common/mock-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('bandit')
-@UseGuards(MockAuthGuard)
 export class BanditController {
   constructor(private bandit: BanditService) {}
 

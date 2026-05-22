@@ -1,9 +1,7 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import { MockAuthGuard } from '../common/mock-auth.guard';
+import { Controller, Get, Req } from '@nestjs/common';
 import { BiasDetectionService } from './bias-detection.service';
 
 @Controller('bias')
-@UseGuards(MockAuthGuard)
 export class BiasController {
   constructor(private biasService: BiasDetectionService) {}
 
