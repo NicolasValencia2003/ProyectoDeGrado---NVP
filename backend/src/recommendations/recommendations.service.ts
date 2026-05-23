@@ -58,7 +58,29 @@ export class RecommendationsService {
       throw new ServiceUnavailableException('El servicio de recomendaciones no está configurado. Contacta al administrador.');
     }
 
-    const result = await this.generateWithClaude(user, prefs, candidates, pricesMap, sentiment, score, excludedTickers);
+    let result: any;
+    try {
+      result = await this.generateWithClaude(user, prefs, candidates, pricesMap, sentiment, excludedTickers);
+    } catch {
+      // Claude unavailable — build directly from pre-computed candidates so the
+      // session is still saved and the frontend never sees an error.
+      result = {
+        recommendations: candidates.map((c: any) => ({
+          ticker:         c.ticker,
+          name:           c.name,
+          allocation_pct: c.allocation_pct,
+          current_price:  c.current_price ?? null,
+          change_1d_pct:  c.change_1d_pct ?? null,
+          asset_class:    c.asset_class,
+          sector:         c.sector,
+          rationale:      `${c.name} es un activo de clase ${c.asset_class} relevante para tu perfil de riesgo ${score}/10, seleccionado como ejemplo educativo de diversificación.`,
+          key_risk:       `Como activo de tipo ${c.asset_class}, su comportamiento está ligado a condiciones específicas del mercado que es importante comprender.`,
+        })),
+        market_summary: 'Portafolio educativo generado a partir del análisis cuantitativo de mercado.',
+        educational_insight: `Con un perfil de riesgo ${score}/10, este portafolio diversificado ofrece una base para aprender sobre distintas clases de activos.`,
+        disclaimer: 'Este contenido es material educativo generado por FinVise, plataforma académica de la Pontificia Universidad Javeriana Cali. No constituye asesoramiento financiero personalizado bajo ninguna norma legal o regulatoria. Consulta un asesor certificado ante la Superintendencia Financiera antes de tomar decisiones de inversión real.',
+      };
+    }
 
     // Post-filter: guarantee excluded tickers never appear regardless of path
     if (excludedTickers.length > 0) {
@@ -69,7 +91,7 @@ export class RecommendationsService {
 
     // Fallback: if Claude ignored the candidates and all results were filtered out,
     // build recommendations directly from the pre-computed candidate pool
-    if (result.recommendations.length === 0 && candidates.length > 0) {
+    if ((result.recommendations ?? []).length === 0 && candidates.length > 0) {
       result.recommendations = candidates.map((c: any) => ({
         ticker:         c.ticker,
         name:           c.name,
@@ -83,12 +105,27 @@ export class RecommendationsService {
       }));
     }
 
+    // Always persist the session regardless of whether Claude succeeded or not.
+    if (this.supabase.isConfigured() && user.id) {
+      const { error: histErr } = await this.supabase.db!.from('recommendation_history').insert({
+        user_id:         user.id,
+        risk_score_used: score,
+        payload:         result,
+        market_snapshot: {
+          fear_greed:       sentiment?.fear_greed       ?? null,
+          fear_greed_label: sentiment?.fear_greed_label ?? null,
+          treasury_10y:     sentiment?.treasury_10y     ?? null,
+        },
+      });
+      if (histErr) this.logger.error(`recommendation_history insert failed: ${histErr.message}`);
+    }
+
     return result;
   }
 
   private async generateWithClaude(
     user: any, prefs: any, candidates: any[],
-    pricesMap: Record<string, any>, sentiment: any, score: number,
+    pricesMap: Record<string, any>, sentiment: any,
     excludedTickers: string[] = [],
   ): Promise<any> {
     const lifeContext      = buildLifeProfileContext(user, prefs);
@@ -171,20 +208,6 @@ Reemplaza el ejemplo con los tickers REALES del portafolio pre-calculado:
         change_1d_pct: pricesMap[r.ticker]?.change_1d_pct ?? null,
         key_risk:      r.key_concept ?? r.key_risk,
       }));
-
-      if (this.supabase.isConfigured() && user.id) {
-        const { error: histErr } = await this.supabase.db!.from('recommendation_history').insert({
-          user_id:         user.id,
-          risk_score_used: score,
-          payload:         parsed,
-          market_snapshot: {
-            fear_greed:       sentiment?.fear_greed       ?? null,
-            fear_greed_label: sentiment?.fear_greed_label ?? null,
-            treasury_10y:     sentiment?.treasury_10y     ?? null,
-          },
-        });
-        if (histErr) this.logger.error(`recommendation_history insert failed: ${histErr.message}`);
-      }
 
       return parsed;
     } catch (err) {

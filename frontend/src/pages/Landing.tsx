@@ -8,11 +8,11 @@ export default function Landing() {
   const { user, profile, loading, profileLoaded } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [mode, setMode]       = useState<'login' | 'register'>('login');
-  const [email, setEmail]     = useState('');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]     = useState('');
-  const [busy, setBusy]       = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   // Redirect if already authenticated.
   // Wait for both auth loading and profile loading to complete before redirecting
@@ -97,7 +97,7 @@ export default function Landing() {
         {/* Hero */}
         <div style={{ maxWidth: 480 }}>
           <div style={{ display: 'inline-block', background: 'rgba(212,168,67,0.1)', border: '1px solid rgba(212,168,67,0.3)', borderRadius: 20, padding: '6px 16px', marginBottom: 24, fontSize: 12, color: 'var(--gold)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            Proyecto de tesis · Javeriana Cali 2025
+            Trabajo de Grado · Pontificia Universidad Javeriana Cali 2026
           </div>
           <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 'clamp(32px, 4vw, 56px)', lineHeight: 1.15, color: 'var(--text-primary)', margin: '0 0 20px' }}>
             Aprende a invertir<br />

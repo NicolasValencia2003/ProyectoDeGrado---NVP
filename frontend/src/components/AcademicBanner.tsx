@@ -24,7 +24,7 @@ export default function AcademicBanner() {
         textOverflow: 'ellipsis',
       }}>
         ⚠ FinVise es material educativo académico — No es asesoramiento financiero &nbsp;|&nbsp;
-        Pontificia Universidad Javeriana Cali · Ingeniería de Sistemas · 2025
+        Pontificia Universidad Javeriana Cali · Ingeniería de Sistemas · 2026
       </span>
     </div>
   );

@@ -129,7 +129,7 @@ export default function AcademicDisclaimer() {
         </button>
 
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 20 }}>
-          Pontificia Universidad Javeriana Cali · Ingeniería de Sistemas · 2025
+          Pontificia Universidad Javeriana Cali · Ingeniería de Sistemas · 2026
         </p>
       </div>
     </div>

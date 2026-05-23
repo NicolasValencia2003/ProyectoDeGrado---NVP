@@ -219,6 +219,7 @@ export default function LearningJourney() {
   const [loading, setLoading]     = useState(true);
   const [comparison, setComparison] = useState<{ pre: SurveyResponse | null; post: SurveyResponse | null }>({ pre: null, post: null });
   const [biasLog, setBiasLog]     = useState<{ type: string; date: string }[]>([]);
+  const [viewedTickerCount, setViewedTickerCount] = useState(0);
   const [biasAnalysis, setBiasAnalysis] = useState<BiasAnalysisResult | null>(null);
   const [banditProfile, setBanditProfile] = useState<BanditProfile | null>(null);
 
@@ -253,9 +254,22 @@ export default function LearningJourney() {
           })));
         }
       });
+
+    supabase
+      .from('user_events')
+      .select('asset_ticker')
+      .eq('user_id', profile.id)
+      .eq('event_type', 'view')
+      .not('asset_ticker', 'is', null)
+      .then(({ data }) => {
+        if (data) {
+          setViewedTickerCount(new Set(data.map(e => e.asset_ticker)).size);
+        }
+      });
   }, [profile?.id]);
 
-  const uniqueTickers = new Set(history.flatMap(e => e.payload.recommendations.map(r => r.ticker)));
+  const uniqueTickersFromHistory = new Set(history.flatMap(e => e.payload.recommendations.map(r => r.ticker)));
+  const uniqueAssetCount = Math.max(uniqueTickersFromHistory.size, viewedTickerCount);
   const biasCount = biasLog.length;
 
   // Build sector evolution data from history
@@ -315,7 +329,7 @@ export default function LearningJourney() {
           {/* Summary stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, marginBottom: 32 }}>
             <StatCard icon="📅" label="Sesiones de aprendizaje" value={history.length} />
-            <StatCard icon="🔍" label="Activos explorados únicos" value={uniqueTickers.size} />
+            <StatCard icon="🔍" label="Activos explorados únicos" value={uniqueAssetCount} />
             <StatCard icon="🧠" label="Sesgos reconocidos" value={biasCount} color="var(--amber)" />
             {comparison.pre && (
               <StatCard icon="📝" label="Encuesta pre completada" value="✓" color="var(--green)" />
