@@ -82,9 +82,15 @@ export class RecommendationsService {
       };
     }
 
+    // Enforce candidate-only tickers: Claude sometimes generates items outside the pre-computed list.
+    const candidateTickers = new Set(candidates.map((c: any) => c.ticker));
+    result.recommendations = (result.recommendations ?? []).filter(
+      (r: any) => candidateTickers.has(r.ticker),
+    );
+
     // Post-filter: guarantee excluded tickers never appear regardless of path
     if (excludedTickers.length > 0) {
-      result.recommendations = (result.recommendations ?? []).filter(
+      result.recommendations = result.recommendations.filter(
         (r: any) => !excludedTickers.includes(r.ticker),
       );
     }
@@ -250,7 +256,7 @@ Reemplaza el ejemplo con los tickers REALES del portafolio pre-calculado:
     const result: any[] = [];
     for (const [assetClass, weight] of Object.entries(rules)) {
       if (weight === 0) continue;
-      const tickers = this.bandit.rank(byClass[assetClass] ?? [], ucbScores).slice(0, 2);
+      const tickers = this.bandit.rank(byClass[assetClass] ?? [], ucbScores).slice(0, 1);
       if (!tickers.length) continue;
       const perTicker = (weight / tickers.length) * 100;
       for (const ticker of tickers) {

@@ -118,7 +118,12 @@ let MarketDataFetcherService = class MarketDataFetcherService {
             if (this.supabase.isConfigured()) {
                 const { data: allCached } = await this.supabase.db.from('prices_cache').select('*');
                 if (allCached?.length) {
-                    const cachedMap = Object.fromEntries(allCached.map((p) => [p.ticker, p]));
+                    const fallback = this.buildFallbackPrices();
+                    const cachedMap = Object.fromEntries(allCached.map((p) => [p.ticker, {
+                            ...fallback[p.ticker],
+                            ...p,
+                            change_1d_pct: p.change_1d_pct ?? fallback[p.ticker]?.change_1d_pct ?? null,
+                        }]));
                     Object.assign(result, cachedMap, cryptoResult);
                     this.log.log(`Prices from Supabase cache (${allCached.length} tickers) + CoinGecko crypto`);
                     const sample = allCached.find((p) => !CRYPTO_TICKERS[p.ticker]);
@@ -366,23 +371,56 @@ let MarketDataFetcherService = class MarketDataFetcherService {
     }
     buildFallbackPrices() {
         const fallback = {
-            SPY: 735, IVV: 735, VOO: 675, VTI: 292, VXUS: 65, EFA: 82, IWM: 210,
-            QQQ: 500, VGT: 620, XLK: 250, AAPL: 213, MSFT: 432, NVDA: 1100,
-            AMZN: 210, GOOGL: 175, META: 620, TSLA: 270,
-            XLF: 50, JPM: 270, V: 365,
-            XLV: 145, JNJ: 155, UNH: 480,
-            XLP: 82, KO: 70, WMT: 105, PG: 175,
-            XLE: 88,
-            SCHD: 82, VYM: 126,
-            VNQ: 82, O: 55,
-            BND: 72, AGG: 95, TLT: 88, SHY: 83, HYG: 77, TIP: 105,
-            GLD: 312, SLV: 32,
-            SGOV: 100.5, BIL: 91.5,
-            'BTC-USD': 76700, 'ETH-USD': 2110, 'SOL-USD': 84,
+            SPY: { price: 524.10, change_1d_pct: 0.42 },
+            IVV: { price: 523.80, change_1d_pct: 0.41 },
+            VOO: { price: 480.50, change_1d_pct: 0.40 },
+            VTI: { price: 254.30, change_1d_pct: 0.38 },
+            VXUS: { price: 58.20, change_1d_pct: 0.21 },
+            EFA: { price: 76.40, change_1d_pct: 0.18 },
+            IWM: { price: 198.70, change_1d_pct: 0.55 },
+            QQQ: { price: 445.32, change_1d_pct: 0.87 },
+            VGT: { price: 570.10, change_1d_pct: 0.93 },
+            XLK: { price: 225.60, change_1d_pct: 0.89 },
+            AAPL: { price: 189.30, change_1d_pct: 0.63 },
+            MSFT: { price: 378.90, change_1d_pct: 0.72 },
+            NVDA: { price: 142.30, change_1d_pct: 1.42 },
+            AMZN: { price: 183.20, change_1d_pct: 0.58 },
+            GOOGL: { price: 164.50, change_1d_pct: 0.44 },
+            META: { price: 490.10, change_1d_pct: 1.05 },
+            TSLA: { price: 175.40, change_1d_pct: -1.18 },
+            XLF: { price: 42.80, change_1d_pct: 0.33 },
+            JPM: { price: 198.60, change_1d_pct: 0.48 },
+            V: { price: 273.40, change_1d_pct: 0.29 },
+            XLV: { price: 139.20, change_1d_pct: -0.12 },
+            JNJ: { price: 147.80, change_1d_pct: -0.08 },
+            UNH: { price: 488.30, change_1d_pct: -0.22 },
+            XLP: { price: 76.50, change_1d_pct: 0.14 },
+            KO: { price: 62.10, change_1d_pct: 0.19 },
+            WMT: { price: 68.40, change_1d_pct: 0.31 },
+            PG: { price: 162.70, change_1d_pct: 0.11 },
+            XLE: { price: 83.20, change_1d_pct: -0.44 },
+            SCHD: { price: 77.60, change_1d_pct: 0.26 },
+            VYM: { price: 119.80, change_1d_pct: 0.22 },
+            VNQ: { price: 91.40, change_1d_pct: 0.22 },
+            O: { price: 54.20, change_1d_pct: 0.18 },
+            BND: { price: 72.50, change_1d_pct: 0.05 },
+            AGG: { price: 98.12, change_1d_pct: 0.08 },
+            TLT: { price: 88.30, change_1d_pct: 0.12 },
+            SHY: { price: 83.40, change_1d_pct: 0.03 },
+            HYG: { price: 76.80, change_1d_pct: 0.07 },
+            TIP: { price: 106.20, change_1d_pct: 0.09 },
+            GLD: { price: 224.85, change_1d_pct: 0.61 },
+            SLV: { price: 28.40, change_1d_pct: 0.74 },
+            SGOV: { price: 100.48, change_1d_pct: 0.01 },
+            BIL: { price: 91.55, change_1d_pct: 0.01 },
+            'BTC-USD': { price: 68420, change_1d_pct: -1.23 },
+            'ETH-USD': { price: 3180, change_1d_pct: -0.88 },
+            'SOL-USD': { price: 142, change_1d_pct: 0.94 },
         };
         const out = {};
         for (const [ticker, meta] of Object.entries(TICKER_META)) {
-            out[ticker] = { ticker, ...meta, price: fallback[ticker] ?? 100, change_1d_pct: null, updated_at: new Date().toISOString() };
+            const f = fallback[ticker] ?? { price: 100, change_1d_pct: 0 };
+            out[ticker] = { ticker, ...meta, price: f.price, change_1d_pct: f.change_1d_pct, updated_at: new Date().toISOString() };
         }
         return out;
     }

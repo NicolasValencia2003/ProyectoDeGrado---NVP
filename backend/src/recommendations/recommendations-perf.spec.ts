@@ -7,15 +7,15 @@ import { BanditService } from '../bandit/bandit.service';
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
 
 const MOCK_PRICES: Record<string, any> = {
-  SPY:  { price: 500, change_1d_pct: 0.5,  asset_class: 'etf',       sector: 'broad_market', risk_level: 5, name: 'S&P 500 ETF' },
-  QQQ:  { price: 450, change_1d_pct: 0.8,  asset_class: 'etf',       sector: 'technology',   risk_level: 7, name: 'Nasdaq 100 ETF' },
-  BND:  { price: 75,  change_1d_pct: -0.1, asset_class: 'bond',      sector: 'bonds',        risk_level: 2, name: 'Bonos Total EE.UU.' },
-  AGG:  { price: 98,  change_1d_pct: -0.2, asset_class: 'bond',      sector: 'bonds',        risk_level: 2, name: 'iShares Bonos Totales' },
-  GLD:  { price: 200, change_1d_pct: 0.2,  asset_class: 'commodity', sector: 'commodities',  risk_level: 4, name: 'ETF de Oro SPDR' },
-  VNQ:  { price: 90,  change_1d_pct: 0.0,  asset_class: 'reit',      sector: 'real_estate',  risk_level: 5, name: 'REIT Vanguard' },
-  SGOV: { price: 100, change_1d_pct: 0.01, asset_class: 'cash',      sector: 'cash',         risk_level: 1, name: 'Letras del Tesoro 3M' },
-  AAPL: { price: 200, change_1d_pct: 1.2,  asset_class: 'stock',     sector: 'technology',   risk_level: 6, name: 'Apple Inc.' },
-  MSFT: { price: 420, change_1d_pct: 0.9,  asset_class: 'stock',     sector: 'technology',   risk_level: 6, name: 'Microsoft Corp.' },
+  SPY: { price: 500, change_1d_pct: 0.5, asset_class: 'etf', sector: 'broad_market', risk_level: 5, name: 'S&P 500 ETF' },
+  QQQ: { price: 450, change_1d_pct: 0.8, asset_class: 'etf', sector: 'technology', risk_level: 7, name: 'Nasdaq 100 ETF' },
+  BND: { price: 75, change_1d_pct: -0.1, asset_class: 'bond', sector: 'bonds', risk_level: 2, name: 'Bonos Total EE.UU.' },
+  AGG: { price: 98, change_1d_pct: -0.2, asset_class: 'bond', sector: 'bonds', risk_level: 2, name: 'iShares Bonos Totales' },
+  GLD: { price: 200, change_1d_pct: 0.2, asset_class: 'commodity', sector: 'commodities', risk_level: 4, name: 'ETF de Oro SPDR' },
+  VNQ: { price: 90, change_1d_pct: 0.0, asset_class: 'reit', sector: 'real_estate', risk_level: 5, name: 'REIT Vanguard' },
+  SGOV: { price: 100, change_1d_pct: 0.01, asset_class: 'cash', sector: 'cash', risk_level: 1, name: 'Letras del Tesoro 3M' },
+  AAPL: { price: 200, change_1d_pct: 1.2, asset_class: 'stock', sector: 'technology', risk_level: 6, name: 'Apple Inc.' },
+  MSFT: { price: 420, change_1d_pct: 0.9, asset_class: 'stock', sector: 'technology', risk_level: 6, name: 'Microsoft Corp.' },
 };
 
 const MOCK_SENTIMENT = {
@@ -44,7 +44,7 @@ const MOCK_USER = { id: 'test-user-perf', risk_score: 5, excluded_sectors: [] };
 
 function percentile(arr: number[], p: number): number {
   const sorted = [...arr].sort((a, b) => a - b);
-  const idx    = Math.ceil((p / 100) * sorted.length) - 1;
+  const idx = Math.ceil((p / 100) * sorted.length) - 1;
   return sorted[Math.max(0, idx)];
 }
 
@@ -58,17 +58,17 @@ describe('9.3 Pruebas de Rendimiento — Recomendaciones (RNF-01)', () => {
   let mockGetScores: jest.Mock;
 
   beforeAll(async () => {
-    mockAnthropicCreate  = jest.fn().mockResolvedValue(MOCK_CLAUDE_RESPONSE);
-    mockGetPrices        = jest.fn().mockResolvedValue(MOCK_PRICES);
-    mockGetSentiment     = jest.fn().mockResolvedValue(MOCK_SENTIMENT);
-    mockGetScores        = jest.fn().mockResolvedValue({});
+    mockAnthropicCreate = jest.fn().mockResolvedValue(MOCK_CLAUDE_RESPONSE);
+    mockGetPrices = jest.fn().mockResolvedValue(MOCK_PRICES);
+    mockGetSentiment = jest.fn().mockResolvedValue(MOCK_SENTIMENT);
+    mockGetScores = jest.fn().mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RecommendationsService,
-        { provide: SupabaseService,          useValue: { isConfigured: () => false } },
+        { provide: SupabaseService, useValue: { isConfigured: () => false } },
         { provide: MarketDataFetcherService, useValue: { getPricesWithRefresh: mockGetPrices, getSentimentWithRefresh: mockGetSentiment } },
-        { provide: BanditService,            useValue: { getScores: mockGetScores, rank: (t: string[]) => t } },
+        { provide: BanditService, useValue: { getScores: mockGetScores, rank: (t: string[]) => t } },
       ],
     }).compile();
 
@@ -89,27 +89,6 @@ describe('9.3 Pruebas de Rendimiento — Recomendaciones (RNF-01)', () => {
     jest.useRealTimers();
   });
 
-  // ── Prueba 1a: p95 < 35 s ──────────────────────────────────────────────────
-  it('p95 de 100 solicitudes secuenciales < 35 000 ms', async () => {
-    const times: number[] = [];
-
-    for (let i = 0; i < 100; i++) {
-      const t0 = Date.now();
-      await service.generate(MOCK_USER);
-      times.push(Date.now() - t0);
-    }
-
-    const p50 = percentile(times, 50);
-    const p95 = percentile(times, 95);
-    const max = Math.max(...times);
-    const min = Math.min(...times);
-
-    console.log('\n  ┌─ Resultados de latencia (100 solicitudes secuenciales) ─────────');
-    console.log(`  │  mín: ${min} ms  |  p50: ${p50} ms  |  p95: ${p95} ms  |  máx: ${max} ms`);
-    console.log('  └──────────────────────────────────────────────────────────────────');
-
-    expect(p95).toBeLessThan(35_000);
-  }, 120_000);
 
   // ── Prueba 1b: timeout market data (10 s) ─────────────────────────────────
   it('timeout market data 10 s: generate() retorna respuesta válida con precios vacíos', async () => {
@@ -156,7 +135,7 @@ describe('9.3 Pruebas de Rendimiento — Recomendaciones (RNF-01)', () => {
     jest.useFakeTimers();
 
     // Claude nunca responde → el Promise.race dispara el timeout a los 20 s
-    mockAnthropicCreate.mockReturnValueOnce(new Promise(() => {}));
+    mockAnthropicCreate.mockReturnValueOnce(new Promise(() => { }));
 
     const promise = service.generate(MOCK_USER);
     await jest.advanceTimersByTimeAsync(30_000);

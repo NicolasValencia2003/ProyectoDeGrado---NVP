@@ -407,52 +407,183 @@ export default function LearningJourney() {
           )}
 
           {/* ── Panel 2: Educational impact metrics ──────────────────── */}
-          {comparison.pre && comparison.post && (() => {
-            const knowledgeGainPct = Math.round(((comparison.post.section_a_score - comparison.pre.section_a_score) / 8) * 100);
-            const confidenceDelta  = comparison.post.section_b_score - comparison.pre.section_b_score;
-            const awarenessScore   = comparison.post.section_c_score;
+          {(comparison.pre || comparison.post) && (() => {
+            const hasBoth = !!(comparison.pre && comparison.post);
+            const knowledgeGainPct = hasBoth
+              ? Math.round(((comparison.post!.section_a_score - comparison.pre!.section_a_score) / 8) * 100)
+              : null;
+            const confidenceDelta = hasBoth
+              ? comparison.post!.section_b_score - comparison.pre!.section_b_score
+              : null;
+
             return (
               <div className="card" style={{ marginBottom: 24, borderLeft: '3px solid var(--blue)', borderRadius: '0 12px 12px 0' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
-                  📐 Métricas de impacto educativo — Validación OE5
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    📐 Impacto educativo
+                  </div>
+                  {!hasBoth && (
+                    <button
+                      onClick={() => navigate(comparison.pre ? '/encuesta?type=post' : '/encuesta?type=pre')}
+                      style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'var(--blue-dim)', border: '1px solid var(--blue)', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+                    >
+                      {comparison.pre ? 'Completar encuesta post →' : 'Completar encuesta pre →'}
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-                  {[
-                    {
-                      label: 'Ganancia de conocimiento',
-                      value: `${knowledgeGainPct >= 0 ? '+' : ''}${knowledgeGainPct}%`,
-                      sub: `${comparison.pre.section_a_score}/8 → ${comparison.post.section_a_score}/8`,
-                      color: knowledgeGainPct > 0 ? 'var(--green)' : knowledgeGainPct < 0 ? 'var(--red)' : 'var(--text-muted)',
-                    },
-                    {
-                      label: 'Confianza en decisiones',
-                      value: `${comparison.post.section_b_score.toFixed(1)} / 5`,
-                      sub: `${confidenceDelta >= 0 ? '+' : ''}${confidenceDelta.toFixed(1)} vs. línea base`,
-                      color: comparison.post.section_b_score >= 3.5 ? 'var(--green)' : 'var(--amber)',
-                    },
-                    {
-                      label: 'Autoconciencia de sesgos',
-                      value: `${awarenessScore.toFixed(1)} / 5`,
-                      sub: 'Sección C — Encuesta post',
-                      color: awarenessScore >= 3.5 ? 'var(--green)' : 'var(--amber)',
-                    },
-                    {
-                      label: 'Valoración de la plataforma',
-                      value: `${comparison.post.overall_rating} / 10`,
-                      sub: 'Satisfacción general',
-                      color: comparison.post.overall_rating >= 7 ? 'var(--green)' : 'var(--amber)',
-                    },
-                  ].map(m => (
-                    <div key={m.label} style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{m.label}</div>
-                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: m.color, marginBottom: 2 }}>{m.value}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m.sub}</div>
-                    </div>
-                  ))}
+
+                {/* Row 1: Knowledge */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Sección A — Ganancia de conocimiento financiero
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                    {comparison.pre && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Línea base (pre)</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {comparison.pre.section_a_score}/8
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{Math.round((comparison.pre.section_a_score / 8) * 100)}% correcto</div>
+                      </div>
+                    )}
+                    {comparison.post && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Post uso (post)</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {comparison.post.section_a_score}/8
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{Math.round((comparison.post.section_a_score / 8) * 100)}% correcto</div>
+                      </div>
+                    )}
+                    {hasBoth && knowledgeGainPct !== null && (
+                      <div style={{ background: knowledgeGainPct > 0 ? 'rgba(16,185,129,0.08)' : 'var(--bg-surface-raised)', border: knowledgeGainPct > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Ganancia</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: knowledgeGainPct > 0 ? 'var(--green)' : knowledgeGainPct < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
+                          {knowledgeGainPct >= 0 ? '+' : ''}{knowledgeGainPct}%
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                          (post − pre) / 8 × 100
+                        </div>
+                      </div>
+                    )}
+                    {!comparison.post && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px', opacity: 0.5, border: '1px dashed var(--border)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Ganancia</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-muted)' }}>—</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Requiere encuesta post</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 2: Confidence */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Sección B — Confianza en decisiones financieras (5 ítems × 5 pts)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                    {comparison.pre && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Pre (prom. / ítem)</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {comparison.pre.section_b_score.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>de 5.00</div>
+                      </div>
+                    )}
+                    {comparison.post && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Post (prom. / ítem)</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: comparison.post.section_b_score >= 3.5 ? 'var(--green)' : 'var(--amber)' }}>
+                          {comparison.post.section_b_score.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>de 5.00</div>
+                      </div>
+                    )}
+                    {hasBoth && confidenceDelta !== null && (
+                      <div style={{ background: confidenceDelta > 0 ? 'rgba(16,185,129,0.08)' : 'var(--bg-surface-raised)', border: confidenceDelta > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Incremento</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: confidenceDelta > 0 ? 'var(--green)' : confidenceDelta < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
+                          {confidenceDelta >= 0 ? '+' : ''}{confidenceDelta.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>promedio por ítem</div>
+                      </div>
+                    )}
+                    {!comparison.post && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px', opacity: 0.5, border: '1px dashed var(--border)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Incremento</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-muted)' }}>—</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Requiere encuesta post</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 3: Bias awareness */}
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Sección C — Autoconciencia de sesgos cognitivos (4 ítems × 5 pts)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                    {comparison.pre && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Pre (prom. / ítem)</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {comparison.pre.section_c_score.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>de 5.00</div>
+                      </div>
+                    )}
+                    {comparison.post && (
+                      <div style={{ background: comparison.post.section_c_score >= 3.5 ? 'rgba(16,185,129,0.08)' : 'var(--bg-surface-raised)', border: comparison.post.section_c_score >= 3.5 ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Post (prom. / ítem)</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: comparison.post.section_c_score >= 3.5 ? 'var(--green)' : 'var(--amber)' }}>
+                          {comparison.post.section_c_score.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>de 5.00</div>
+                      </div>
+                    )}
+                    {hasBoth && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Delta</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: (comparison.post!.section_c_score - comparison.pre!.section_c_score) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                          {(comparison.post!.section_c_score - comparison.pre!.section_c_score) >= 0 ? '+' : ''}
+                          {(comparison.post!.section_c_score - comparison.pre!.section_c_score).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>promedio por ítem</div>
+                      </div>
+                    )}
+                    {!comparison.post && (
+                      <div style={{ background: 'var(--bg-surface-raised)', borderRadius: 8, padding: '12px 14px', opacity: 0.5, border: '1px dashed var(--border)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Post</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 22, fontWeight: 700, color: 'var(--text-muted)' }}>—</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Requiere encuesta post</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })()}
+
+          {/* Prompt when no surveys at all */}
+          {!comparison.pre && !comparison.post && (
+            <div className="card" style={{ marginBottom: 24, borderLeft: '3px solid var(--blue)', borderRadius: '0 12px 12px 0' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                📐 Impacto educativo
+              </div>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                Completa la encuesta pre para establecer tu línea base de conocimiento financiero.
+              </p>
+              <button
+                onClick={() => navigate('/encuesta?type=pre')}
+                style={{ fontSize: 13, padding: '8px 16px', borderRadius: 8, background: 'var(--blue-dim)', border: '1px solid var(--blue)', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', fontWeight: 600 }}
+              >
+                Iniciar encuesta pre →
+              </button>
+            </div>
+          )}
 
           {/* ── Panel 3: Recommendation history performance ───────────── */}
           {history.length >= 2 && (() => {
@@ -491,17 +622,9 @@ export default function LearningJourney() {
           {/* Bias radar */}
           {biasAnalysis && <BiasRadar analysis={biasAnalysis} />}
 
-          {/* Pre/post comparison */}
+          {/* Pre/post detailed comparison (only when both surveys are done) */}
           {comparison.pre && comparison.post && (
             <ScoreComparison pre={comparison.pre} post={comparison.post} />
-          )}
-
-          {!comparison.post && comparison.pre && (
-            <div className="card" style={{ marginBottom: 24, borderLeft: '3px solid var(--amber)', borderRadius: '0 12px 12px 0' }}>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                ⏳ Completa la encuesta de impacto post para ver tu evolución de conocimiento financiero.
-              </p>
-            </div>
           )}
 
           {/* Sector evolution chart */}

@@ -12,11 +12,41 @@ interface Props {
   riskScore?: number;
 }
 
+// Representative score for each profile band (midpoint of the range)
+const PROFILE_ORDER = ['conservative', 'balanced', 'growth', 'aggressive'] as const;
+type ProfileKey = typeof PROFILE_ORDER[number];
+
+const PROFILE_SCORE: Record<ProfileKey, number> = {
+  conservative: 2,
+  balanced: 5,
+  growth: 7,
+  aggressive: 9,
+};
+
+const PROFILE_LABEL: Record<ProfileKey, string> = {
+  conservative: 'Conservador',
+  balanced: 'Equilibrado',
+  growth: 'Crecimiento',
+  aggressive: 'Agresivo',
+};
+
+function getProfileKey(score: number): ProfileKey {
+  if (score <= 3) return 'conservative';
+  if (score <= 6) return 'balanced';
+  if (score <= 8) return 'growth';
+  return 'aggressive';
+}
+
 export default function ScenarioTabs({ initialData, onItemsChange, preferences = {}, riskScore = 7 }: Props) {
+  const currentProfile = getProfileKey(riskScore);
+  const currentProfileIdx = PROFILE_ORDER.indexOf(currentProfile);
+  const lowerProfile = PROFILE_ORDER[Math.max(0, currentProfileIdx - 1)];
+  const upperProfile = PROFILE_ORDER[Math.min(PROFILE_ORDER.length - 1, currentProfileIdx + 1)];
+
   const scenarios = [
-    { label: 'Conservador', override: Math.max(1, riskScore - 3) },
-    { label: 'Tu perfil',   override: riskScore },
-    { label: 'Agresivo',    override: Math.min(10, riskScore + 3) },
+    { label: PROFILE_LABEL[lowerProfile], override: PROFILE_SCORE[lowerProfile] },
+    { label: 'Tu perfil',                 override: riskScore },
+    { label: PROFILE_LABEL[upperProfile], override: PROFILE_SCORE[upperProfile] },
   ];
 
   const [activeIdx, setActiveIdx] = useState(1);

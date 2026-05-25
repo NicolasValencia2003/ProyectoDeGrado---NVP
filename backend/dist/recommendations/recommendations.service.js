@@ -84,8 +84,10 @@ let RecommendationsService = class RecommendationsService {
                 disclaimer: 'Este contenido es material educativo generado por FinVise, plataforma académica de la Pontificia Universidad Javeriana Cali. No constituye asesoramiento financiero personalizado bajo ninguna norma legal o regulatoria. Consulta un asesor certificado ante la Superintendencia Financiera antes de tomar decisiones de inversión real.',
             };
         }
+        const candidateTickers = new Set(candidates.map((c) => c.ticker));
+        result.recommendations = (result.recommendations ?? []).filter((r) => candidateTickers.has(r.ticker));
         if (excludedTickers.length > 0) {
-            result.recommendations = (result.recommendations ?? []).filter((r) => !excludedTickers.includes(r.ticker));
+            result.recommendations = result.recommendations.filter((r) => !excludedTickers.includes(r.ticker));
         }
         if ((result.recommendations ?? []).length === 0 && candidates.length > 0) {
             result.recommendations = candidates.map((c) => ({
@@ -228,7 +230,7 @@ Reemplaza el ejemplo con los tickers REALES del portafolio pre-calculado:
         for (const [assetClass, weight] of Object.entries(rules)) {
             if (weight === 0)
                 continue;
-            const tickers = this.bandit.rank(byClass[assetClass] ?? [], ucbScores).slice(0, 2);
+            const tickers = this.bandit.rank(byClass[assetClass] ?? [], ucbScores).slice(0, 1);
             if (!tickers.length)
                 continue;
             const perTicker = (weight / tickers.length) * 100;

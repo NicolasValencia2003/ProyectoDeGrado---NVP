@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
-
-const api = axios.create({ baseURL: 'http://localhost:3000/api' });
+import { saveSurvey, getSurveyComparison } from '../services/api';
 
 /* ─── Section A: conceptual knowledge ─── */
 const SECTION_A = [
@@ -173,7 +171,7 @@ export default function Survey() {
 
   useEffect(() => {
     if (surveyType === 'post') {
-      api.get('/survey/comparison').then(r => setComparison(r.data)).catch(() => {});
+      getSurveyComparison().then(setComparison).catch(() => {});
     }
   }, [surveyType]);
 
@@ -203,9 +201,9 @@ export default function Survey() {
   /* ─── Submit ─── */
   async function handleSubmit() {
     setSubmitting(true);
-    const bScore = bAnswers.reduce((a, b) => a + b, 0);
-    const cScore = cAnswers.reduce((a, b) => a + b, 0);
-    await api.post('/survey', {
+    const bScore = parseFloat((bAnswers.reduce((a, b) => a + b, 0) / bAnswers.length).toFixed(4));
+    const cScore = parseFloat((cAnswers.reduce((a, b) => a + b, 0) / cAnswers.length).toFixed(4));
+    await saveSurvey({
       survey_type:        surveyType,
       section_a_score:    aScore,
       section_a_answers:  aAnswers,
@@ -216,7 +214,7 @@ export default function Survey() {
       section_d_rating:   dRating,
       section_d_learned:  dLearned,
       section_d_recommend: dRecommend,
-    }).catch(() => {});
+    } as any).catch(() => {});
     setSubmitting(false);
     setPhase('done');
   }
